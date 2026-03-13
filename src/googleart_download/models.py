@@ -114,6 +114,7 @@ class BatchTask:
     state: TaskState
     result: DownloadResult | None = None
     error: str | None = None
+    attempts: int = 0
 
 
 @dataclass(frozen=True)
@@ -150,3 +151,4 @@ class BatchRunResult:
     snapshot: BatchSnapshot
     succeeded: list[DownloadResult]
     failed: list[BatchTask]
+    rerun_rounds: int = 0

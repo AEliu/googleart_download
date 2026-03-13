@@ -125,6 +125,8 @@ class RichCliReporter(Reporter):
             f"[{style}]Completed {snapshot.succeeded} succeeded, {snapshot.skipped} skipped, "
             f"{snapshot.failed} failed, {snapshot.pending} pending.[/{style}]"
         )
+        if run_result.rerun_rounds:
+            self.log(f"Rerun rounds used: {run_result.rerun_rounds}")
 
 
 class RichTuiReporter(Reporter):
@@ -263,6 +265,8 @@ class RichTuiReporter(Reporter):
             f"Finished {run_result.snapshot.succeeded} succeeded, {run_result.snapshot.skipped} skipped, "
             f"{run_result.snapshot.failed} failed"
         )
+        if run_result.rerun_rounds:
+            self.log_line(f"Rerun rounds used: {run_result.rerun_rounds}")
         self.live.update(self.render())
 
     def close(self) -> None:

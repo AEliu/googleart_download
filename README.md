@@ -14,6 +14,7 @@
 - 已存在文件默认跳过
 - 可选将作品元数据写入 JPEG EXIF
 - 可选输出同名 JSON sidecar 元数据文件
+- 失败作品可按批次轮次重跑
 
 ## 安装
 
@@ -59,6 +60,12 @@ uv run googleart-download --url-file urls.txt --tui
 
 ```bash
 uv run googleart-download "https://artsandculture.google.com/asset/..." --retries 5 --retry-backoff 1.0
+```
+
+失败作品按批次再跑一轮：
+
+```bash
+uv run googleart-download --url-file urls.txt --rerun-failures 1
 ```
 
 批量失败时继续处理后续任务：

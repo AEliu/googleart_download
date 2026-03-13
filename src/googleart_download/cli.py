@@ -51,6 +51,12 @@ def parse_args() -> argparse.Namespace:
         help="base backoff in seconds before retrying failed requests (default: 0.75)",
     )
     parser.add_argument(
+        "--rerun-failures",
+        type=int,
+        default=0,
+        help="how many extra batch rounds to rerun artworks that still failed after request-level retries",
+    )
+    parser.add_argument(
         "--fail-fast",
         action="store_true",
         help="stop the batch immediately after the first failed artwork",
@@ -99,6 +105,9 @@ def collect_urls(args: argparse.Namespace) -> list[str]:
     if args.retry_backoff < 0:
         raise DownloadError("--retry-backoff must be >= 0")
 
+    if args.rerun_failures < 0:
+        raise DownloadError("--rerun-failures must be >= 0")
+
     return urls
 
 
@@ -109,6 +118,7 @@ def render_summary(run_result: BatchRunResult) -> None:
     table.add_column("Title / URL")
     table.add_column("Size", justify="right")
     table.add_column("Tiles", justify="right")
+    table.add_column("Attempts", justify="right")
     table.add_column("Path / Error")
     table.add_column("Sidecar")
 
@@ -116,16 +126,18 @@ def render_summary(run_result: BatchRunResult) -> None:
         status = "skipped" if result.skipped else "ok"
         size = "-" if result.size is None else f"{result.size[0]}x{result.size[1]}"
         tiles = "-" if result.tile_count is None else str(result.tile_count)
+        attempts = next((str(task.attempts) for task in run_result.snapshot.tasks if task.result == result), "-")
         table.add_row(
             status,
             result.title,
             size,
             tiles,
+            attempts,
             str(result.output_path),
             str(result.sidecar_path) if result.sidecar_path else "-",
         )
     for task in run_result.failed:
-        table.add_row("failed", task.url, "-", "-", task.error or "unknown error", "-")
+        table.add_row("failed", task.url, "-", "-", str(task.attempts), task.error or "unknown error", "-")
     console.print(table)
 
 
@@ -153,6 +165,7 @@ def main() -> int:
             skip_existing=not args.no_skip_existing,
             write_metadata=args.write_metadata,
             write_sidecar=args.write_sidecar,
+            rerun_failures=args.rerun_failures,
         )
         run_result = manager.run()
     except DownloadError as exc:

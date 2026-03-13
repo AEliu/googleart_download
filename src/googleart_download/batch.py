@@ -23,6 +23,7 @@ class BatchDownloadManager:
         skip_existing: bool,
         write_metadata: bool,
         write_sidecar: bool,
+        rerun_failures: int,
     ) -> None:
         self.urls = urls
         self.output_dir = output_dir
@@ -34,6 +35,7 @@ class BatchDownloadManager:
         self.skip_existing = skip_existing
         self.write_metadata = write_metadata
         self.write_sidecar = write_sidecar
+        self.rerun_failures = rerun_failures
         self.tasks = [
             BatchTask(index=index, url=url, state=TaskState.PENDING)
             for index, url in enumerate(urls, start=1)
@@ -42,44 +44,65 @@ class BatchDownloadManager:
     def run(self) -> BatchRunResult:
         self.reporter.batch_started(len(self.tasks))
         self.reporter.batch_updated(self.snapshot)
+        rerun_rounds_used = 0
+        round_number = 0
 
-        for task in list(self.tasks):
-            self._update_task(task.index, state=TaskState.RUNNING, error=None)
-            self.reporter.batch_updated(self.snapshot)
+        while True:
+            round_number += 1
+            rerun_candidates = [task for task in self.tasks if task.state in {TaskState.PENDING, TaskState.FAILED}]
+            if not rerun_candidates:
+                break
 
-            try:
-                result = download_artwork(
-                    url=task.url,
-                    output_dir=self.output_dir,
-                    filename=self.filename,
-                    workers=self.workers,
-                    retry_config=self.retry_config,
-                    skip_existing=self.skip_existing,
-                    write_metadata=self.write_metadata,
-                    write_sidecar=self.write_sidecar,
-                    reporter=self.reporter,
-                    index=task.index,
-                    total=len(self.tasks),
-                )
-            except DownloadError as exc:
-                failed_task = self._update_task(task.index, state=TaskState.FAILED, error=str(exc))
-                self.reporter.task_failed(failed_task)
+            if round_number > 1:
+                rerun_rounds_used += 1
+                self.reporter.log(f"Rerun round {rerun_rounds_used}: retrying {len(rerun_candidates)} failed artwork(s)")
+
+            stop_batch = False
+            for task in rerun_candidates:
+                self._update_task(task.index, state=TaskState.RUNNING, error=None, attempts=task.attempts + 1)
                 self.reporter.batch_updated(self.snapshot)
-                if self.fail_fast:
-                    break
-            else:
-                state = TaskState.SKIPPED if result.skipped else TaskState.SUCCEEDED
-                completed_task = self._update_task(task.index, state=state, result=result, error=None)
-                if result.skipped:
-                    self.reporter.task_skipped(completed_task)
+
+                try:
+                    result = download_artwork(
+                        url=task.url,
+                        output_dir=self.output_dir,
+                        filename=self.filename,
+                        workers=self.workers,
+                        retry_config=self.retry_config,
+                        skip_existing=self.skip_existing,
+                        write_metadata=self.write_metadata,
+                        write_sidecar=self.write_sidecar,
+                        reporter=self.reporter,
+                        index=task.index,
+                        total=len(self.tasks),
+                    )
+                except DownloadError as exc:
+                    failed_task = self._update_task(task.index, state=TaskState.FAILED, error=str(exc))
+                    self.reporter.task_failed(failed_task)
+                    self.reporter.batch_updated(self.snapshot)
+                    if self.fail_fast:
+                        stop_batch = True
+                        break
                 else:
-                    self.reporter.artwork_finished(result)
-                self.reporter.batch_updated(self.snapshot)
+                    state = TaskState.SKIPPED if result.skipped else TaskState.SUCCEEDED
+                    completed_task = self._update_task(task.index, state=state, result=result, error=None)
+                    if result.skipped:
+                        self.reporter.task_skipped(completed_task)
+                    else:
+                        self.reporter.artwork_finished(result)
+                    self.reporter.batch_updated(self.snapshot)
+
+            if stop_batch:
+                break
+
+            if rerun_rounds_used >= self.rerun_failures:
+                break
 
         run_result = BatchRunResult(
             snapshot=self.snapshot,
             succeeded=[task.result for task in self.tasks if task.result is not None],
             failed=[task for task in self.tasks if task.state == TaskState.FAILED],
+            rerun_rounds=rerun_rounds_used,
         )
         self.reporter.batch_finished(run_result)
         return run_result
@@ -95,8 +118,15 @@ class BatchDownloadManager:
         state: TaskState,
         result: DownloadResult | None = None,
         error: str | None = None,
+        attempts: int | None = None,
     ) -> BatchTask:
         task_index = index - 1
-        updated = replace(self.tasks[task_index], state=state, result=result, error=error)
+        updated = replace(
+            self.tasks[task_index],
+            state=state,
+            result=result,
+            error=error,
+            attempts=self.tasks[task_index].attempts if attempts is None else attempts,
+        )
         self.tasks[task_index] = updated
         return updated
