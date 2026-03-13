@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from ..logging_utils import get_logger
-from ..metadata.output import write_metadata_sidecar
+from ..metadata.output import metadata_to_dict, write_metadata_sidecar
 from ..metadata.parsers import normalize_asset_url, parse_page_info, parse_tile_info
 from ..models import ArtworkContext, DownloadResult, DownloadSize, RetryConfig, SizeOption, StitchBackend, TileInfo
 from ..reporters import Reporter
@@ -21,6 +21,17 @@ def inspect_artwork_sizes(url: str, retry_config: RetryConfig) -> tuple[str, lis
     page = parse_page_info(html)
     tile_info = parse_tile_info(http_client.fetch_bytes(page.tile_info_url, description="tile metadata"))
     return page.title, list_size_options(tile_info)
+
+
+def inspect_artwork_metadata(url: str, retry_config: RetryConfig) -> dict[str, str]:
+    http_client = HttpClient(retry_config=retry_config)
+    asset_url = normalize_asset_url(url)
+    html = http_client.fetch_text(asset_url, description="artwork page")
+    page = parse_page_info(html)
+    payload = metadata_to_dict(page.metadata) if page.metadata is not None else {}
+    payload["asset_url"] = asset_url
+    payload.setdefault("title", page.title)
+    return payload
 
 
 def download_artwork(

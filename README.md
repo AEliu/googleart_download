@@ -98,6 +98,18 @@ uv run googleart-download --url-file urls.txt --rerun-failures 1
 uv run googleart-download "https://artsandculture.google.com/asset/..." --list-sizes
 ```
 
+只抓作品元信息，不下载图片：
+
+```bash
+uv run googleart-download "https://artsandculture.google.com/asset/..." --metadata-only
+```
+
+把元信息写到 JSON 文件：
+
+```bash
+uv run googleart-download "https://artsandculture.google.com/asset/..." --metadata-only --metadata-output metadata.json
+```
+
 按用户友好的预设尺寸下载：
 
 ```bash
@@ -172,6 +184,10 @@ uv run googleart-download "https://artsandculture.google.com/asset/..." --log-fi
 - 如果大图下载过程中出现单个 tile 的 SSL / EOF / timeout 之类网络错误，通常可以直接重跑；已下载 tile 会从缓存复用。此时优先尝试提高 `--retries`，必要时再适当降低 `--workers`。
 - `--filename` 只适用于单个 URL 下载；批量下载时不能和多个 URL 一起使用。
 - `--list-sizes` 只适用于单个 URL；它会读取页面和瓦片元数据后直接退出，不会开始图片下载。
+- `--metadata-only` 只抓作品页元信息并输出 JSON，不会下载 tile 或生成图片文件。
+- `--metadata-output` 可以把 `--metadata-only` 的结果写入 JSON 文件。
+- 单个 URL 使用 `--metadata-only` 且未指定 `--metadata-output` 时，会默认写出同名的 `.metadata.json` 文件。
+- 多个 URL 使用 `--metadata-only` 且未指定 `--metadata-output` 时，默认打印到标准输出。
 - `--log-file` 会把日志写入文件，`-v` 会开启更详细的日志输出。
 - `--tui` 会启用 richer terminal dashboard；如果你更喜欢纯 CLI 输出，可以不加它。
 - 下载时会把单张作品的 tile 临时缓存到输出目录下的 `.googleart-cache/`。如果下载过程中中断，下次运行会自动复用已经完成的 tile。

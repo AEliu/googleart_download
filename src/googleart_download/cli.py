@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 from pathlib import Path
 
@@ -8,7 +9,8 @@ from rich.console import Console
 from rich.table import Table
 
 from .batch import BatchDownloadManager
-from .download.downloader import inspect_artwork_sizes
+from .download.downloader import inspect_artwork_metadata, inspect_artwork_sizes
+from .download.image_writer import resolve_output_path
 from .errors import DownloadError, build_error_guidance
 from .logging_utils import configure_logging
 from .models import BatchRunResult, DownloadSize, RetryConfig, SizeOption, StitchBackend
@@ -100,6 +102,15 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="inspect available download sizes for a single artwork URL and exit",
     )
+    parser.add_argument(
+        "--metadata-only",
+        action="store_true",
+        help="fetch artwork metadata only and output JSON without downloading image tiles",
+    )
+    parser.add_argument(
+        "--metadata-output",
+        help="write metadata-only JSON output to a file instead of stdout",
+    )
     parser.add_argument("--tui", action="store_true", help="show a richer live terminal dashboard")
     parser.add_argument("--log-file", help="write logs to a file")
     parser.add_argument("-v", "--verbose", action="store_true", help="enable debug logging")
@@ -157,6 +168,33 @@ def render_size_options(title: str, options: list[SizeOption]) -> None:
     console.print(table)
 
 
+def render_metadata_output(results: list[dict[str, str]], output_path: str | None) -> None:
+    payload = json.dumps(results, ensure_ascii=False, indent=2) + "\n"
+    if output_path:
+        Path(output_path).write_text(payload, encoding="utf-8")
+        Console(stderr=True).print(f"[cyan]•[/cyan] Metadata saved: {output_path}")
+    else:
+        Console().print_json(payload)
+
+
+def resolve_default_metadata_output_path(
+    *,
+    output_dir: str,
+    filename: str | None,
+    title: str,
+    download_size: DownloadSize,
+    max_dimension: int | None,
+) -> Path:
+    image_path = resolve_output_path(
+        Path(output_dir),
+        filename,
+        title,
+        download_size=download_size,
+        max_dimension=max_dimension,
+    )
+    return image_path.with_suffix(".metadata.json")
+
+
 def render_summary(run_result: BatchRunResult) -> None:
     console = Console()
     table = Table(title="Download Summary", header_style="bold cyan")
@@ -205,6 +243,21 @@ def main() -> int:
                 raise DownloadError("--list-sizes requires exactly one artwork URL")
             title, options = inspect_artwork_sizes(urls[0], retry_config)
             render_size_options(title, options)
+            return 0
+        if args.metadata_only:
+            results = [inspect_artwork_metadata(url, retry_config) for url in urls]
+            metadata_output = args.metadata_output
+            if metadata_output is None and len(urls) == 1:
+                metadata_output = str(
+                    resolve_default_metadata_output_path(
+                        output_dir=args.output_dir,
+                        filename=args.filename,
+                        title=results[0]["title"],
+                        download_size=DownloadSize(args.size),
+                        max_dimension=args.max_dimension,
+                    )
+                )
+            render_metadata_output(results, metadata_output)
             return 0
         manager = BatchDownloadManager(
             urls=urls,

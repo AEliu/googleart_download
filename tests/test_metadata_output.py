@@ -5,8 +5,9 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+from googleart_download.cli import resolve_default_metadata_output_path
 from googleart_download.metadata import metadata_to_dict, write_metadata_sidecar
-from googleart_download.models import ArtworkMetadata
+from googleart_download.models import ArtworkMetadata, DownloadSize
 from googleart_download.metadata.parsers import normalize_asset_url, parse_artwork_metadata
 
 
@@ -67,6 +68,40 @@ class MetadataOutputTests(unittest.TestCase):
             "https://artsandculture.google.com/asset/%E6%98%9F%E5%A4%9C-"
             "%E6%96%87%E6%A3%AE%E7%89%B9%C2%B7%E6%A2%B5%C2%B7%E9%AB%98/bgEuwDxel93-Pg",
         )
+
+    def test_metadata_to_dict_can_be_used_for_metadata_only_payload(self) -> None:
+        metadata = ArtworkMetadata(title="Artwork Title", creator="Artist Name", source_url="https://example.com/art")
+        payload = metadata_to_dict(metadata)
+        payload["asset_url"] = "https://example.com/art"
+        self.assertEqual(
+            payload,
+            {
+                "title": "Artwork Title",
+                "creator": "Artist Name",
+                "source_url": "https://example.com/art",
+                "asset_url": "https://example.com/art",
+            },
+        )
+
+    def test_default_metadata_output_path_matches_image_naming_rules(self) -> None:
+        path = resolve_default_metadata_output_path(
+            output_dir="downloads",
+            filename=None,
+            title="Artwork Title",
+            download_size=DownloadSize.MEDIUM,
+            max_dimension=None,
+        )
+        self.assertEqual(path.name, "Artwork Title.medium.metadata.json")
+
+    def test_default_metadata_output_path_respects_explicit_filename(self) -> None:
+        path = resolve_default_metadata_output_path(
+            output_dir="downloads",
+            filename="custom-name.jpg",
+            title="Artwork Title",
+            download_size=DownloadSize.MAX,
+            max_dimension=None,
+        )
+        self.assertEqual(path.name, "custom-name.metadata.json")
 
 
 if __name__ == "__main__":

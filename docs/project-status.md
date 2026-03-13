@@ -14,6 +14,8 @@ The project currently supports:
 - batch-level failed task reruns via `--rerun-failures`
 - user-friendly size selection via `--size` and `--max-dimension`
 - size inspection via `--list-sizes`
+- metadata-only inspection via `--metadata-only`
+- default metadata-only file output for single-url runs
 - skip-existing behavior by default, with `--no-skip-existing` override
 - single-artwork tile cache reuse across reruns
 - conservative memory guard before stitching extremely large images
