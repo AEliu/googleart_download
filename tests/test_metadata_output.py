@@ -7,7 +7,7 @@ from tempfile import TemporaryDirectory
 
 from googleart_download.metadata import metadata_to_dict, write_metadata_sidecar
 from googleart_download.models import ArtworkMetadata
-from googleart_download.metadata.parsers import parse_artwork_metadata
+from googleart_download.metadata.parsers import normalize_asset_url, parse_artwork_metadata
 
 
 class MetadataOutputTests(unittest.TestCase):
@@ -54,6 +54,19 @@ class MetadataOutputTests(unittest.TestCase):
     def test_metadata_to_dict_omits_empty_values(self) -> None:
         payload = metadata_to_dict(ArtworkMetadata(title="Title", creator=None, description=""))
         self.assertEqual(payload, {"title": "Title"})
+
+    def test_normalize_asset_url_strips_terminal_wrapped_whitespace(self) -> None:
+        raw = (
+            "https://artsandculture.google.com/asset/%E6%98%9F%E5%A4\n"
+            "%9C-%E6%96%87%E6%A3%AE%E7%89%B9%C2%B7%E6%A2%B5%C2%B7%E9%AB%98/bgEuwDxel93-Pg"
+        )
+        normalized = normalize_asset_url(raw)
+        self.assertNotIn("\n", normalized)
+        self.assertEqual(
+            normalized,
+            "https://artsandculture.google.com/asset/%E6%98%9F%E5%A4%9C-"
+            "%E6%96%87%E6%A3%AE%E7%89%B9%C2%B7%E6%A2%B5%C2%B7%E9%AB%98/bgEuwDxel93-Pg",
+        )
 
 
 if __name__ == "__main__":

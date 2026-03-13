@@ -58,6 +58,12 @@ uv run googleart-download "https://artsandculture.google.com/asset/recto-the-fet
 uv run googleart-download "https://artsandculture.google.com/asset/recto-the-fetus-in-the-womb-verso-notes-on-reproduction-with-sketches-of-a-fetus-in-utero-etc-leonardo-da-vinci/qgFUAw5Zc1wsbw" -o downloads -f fetus.jpg
 ```
 
+提高 tile 下载并发：
+
+```bash
+uv run googleart-download "https://artsandculture.google.com/asset/..." --workers 32
+```
+
 批量下载：
 
 ```bash
@@ -151,18 +157,36 @@ uv run googleart-download "https://artsandculture.google.com/asset/..." --stitch
 uv run googleart-download "https://artsandculture.google.com/asset/..." --stitch-backend pyvips
 ```
 
+日志和详细输出：
+
+```bash
+uv run googleart-download "https://artsandculture.google.com/asset/..." --log-file logs/run.log -v
+```
+
 ## 说明
 
 - 需要完整的作品页 URL。你给的示例链接少了最后的作品 ID，正确格式通常是 `/asset/<slug>/<assetId>`。
+- 如果从终端或聊天窗口复制 URL 时混入了换行或空格，程序会先清理这些空白字符再继续解析。
 - 程序当前面向单张作品页，不处理整个合集或故事页。
+- `--workers` 控制单张作品内部的 tile 下载并发数。默认值是自动计算的，通常不需要手动改；网络好、机器资源足够时可以适当调高，但过高可能触发限速、重试增多，甚至整体更慢。
+- `--filename` 只适用于单个 URL 下载；批量下载时不能和多个 URL 一起使用。
+- `--list-sizes` 只适用于单个 URL；它会读取页面和瓦片元数据后直接退出，不会开始图片下载。
+- `--log-file` 会把日志写入文件，`-v` 会开启更详细的日志输出。
+- `--tui` 会启用 richer terminal dashboard；如果你更喜欢纯 CLI 输出，可以不加它。
 - 下载时会把单张作品的 tile 临时缓存到输出目录下的 `.googleart-cache/`。如果下载过程中中断，下次运行会自动复用已经完成的 tile。
 - 单张作品成功写出后，会默认清理对应的 tile 缓存；失败时缓存会保留，便于恢复。
+- 最终图片会先写到保留原扩展名的临时文件，再原子替换成目标文件，避免半成品污染正式输出。
 - `--size` 是用户友好的语义化尺寸预设；`--max-dimension` 则允许你直接控制最长边上限。
 - 默认仍然是 `--size max`，也就是下载当前可用的最大尺寸。
 - `--list-sizes` 不会开始下载图片，只会读取页面和瓦片元数据，列出当前作品可选的层级尺寸和 tile 数。
+- 输出文件命名规则：
+  - `--size max` 默认不加尺寸后缀
+  - 非 `max` 尺寸会自动加 `.preview` / `.medium` / `.large`
+  - `--max-dimension 8000` 会自动加 `.maxdim-8000`
+  - 如果显式传了 `--filename`，则完全尊重用户文件名
 - `--stitch-backend auto` 会优先使用 Pillow；当图像过大、不适合安全内存拼接时，会切到 `pyvips`。
 - 如果系统没有可用的 `pyvips/libvips`，超大图会明确报错并提示安装，而不是继续把机器顶死。
 - 当前 `pyvips` 路径还不支持写 JPEG EXIF。超大图场景下如果需要元数据，优先使用 `--write-sidecar`。
 - 有些页面可能会被地区、权限或站点改版影响，如果 Google 改了瓦片签名规则，代码也需要跟着调整。
 - 目前的 TUI 是基于 `rich` 的 live dashboard，不是复杂的全屏交互应用。这是有意为之，因为当前任务流是单向下载任务，`rich` 方案更稳、更容易维护。
-- 包代码现在采用 `src/` 目录布局。根目录的 [main.py](/home/chao/code/googleart-download/main.py) 只是兼容入口。
+- 包代码现在采用 `src/` 目录布局。根目录的 `main.py` 只是兼容入口。

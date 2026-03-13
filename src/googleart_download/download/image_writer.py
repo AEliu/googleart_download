@@ -26,6 +26,12 @@ def build_output_suffix(download_size: DownloadSize, max_dimension: int | None) 
     return f".{download_size.value}"
 
 
+def build_temp_output_path(output_path: Path) -> Path:
+    if output_path.suffix:
+        return output_path.with_name(f"{output_path.stem}.part{output_path.suffix}")
+    return output_path.with_name(f"{output_path.name}.part")
+
+
 def resolve_output_path(
     output_dir: Path,
     filename: str | None,
@@ -114,7 +120,7 @@ def _save_with_pillow(
     metadata: ArtworkMetadata | None,
     write_metadata: bool,
 ) -> None:
-    temp_output_path = output_path.with_suffix(output_path.suffix + ".part")
+    temp_output_path = build_temp_output_path(output_path)
     try:
         if write_metadata and metadata is not None:
             exif_bytes = build_exif_bytes(metadata)
@@ -170,7 +176,7 @@ def _stitch_with_pyvips(
     pyvips = _load_pyvips()
     level = tile_info.highest_level
     rows: list[object] = []
-    temp_output_path = output_path.with_suffix(output_path.suffix + ".part")
+    temp_output_path = build_temp_output_path(output_path)
 
     for y in range(level.num_tiles_y):
         row_images: list[object] = []

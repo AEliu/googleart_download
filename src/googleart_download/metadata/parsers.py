@@ -11,6 +11,7 @@ from ..models import ArtworkMetadata, PageInfo, PyramidLevel, TileInfo
 
 
 def normalize_asset_url(url: str) -> str:
+    url = re.sub(r"\s+", "", url)
     parsed = urllib.parse.urlparse(url)
     if not parsed.scheme:
         url = f"https://{url.lstrip('/')}"

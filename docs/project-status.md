@@ -21,7 +21,7 @@ The project currently supports:
 - optional JPEG EXIF metadata writing via `--write-metadata`
 - optional JSON sidecar metadata output via `--write-sidecar`
 - batch task state tracking: pending, running, skipped, succeeded, failed
-- basic unit tests for batch rerun behavior and metadata output
+- unit tests for batch rerun behavior, metadata output, tile cache, size selection, and output naming
 
 ## Current code structure
 

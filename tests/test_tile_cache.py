@@ -8,6 +8,7 @@ from PIL import Image
 
 from googleart_download.download.cache import ensure_cache_layout
 from googleart_download.download.image_writer import (
+    build_temp_output_path,
     choose_stitch_backend,
     ensure_stitch_memory_budget,
     resolve_output_path,
@@ -166,6 +167,10 @@ class TileCacheTests(unittest.TestCase):
             max_dimension=8000,
         )
         self.assertEqual(path.name, "The Starry Night.maxdim-8000.jpg")
+
+    def test_build_temp_output_path_preserves_image_extension(self) -> None:
+        path = build_temp_output_path(Path("/tmp/The Starry Night.preview.jpg"))
+        self.assertEqual(path.name, "The Starry Night.preview.part.jpg")
 
 
 if __name__ == "__main__":
