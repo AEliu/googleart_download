@@ -6,11 +6,11 @@ from rich.console import Console, Group
 from rich.layout import Layout
 from rich.live import Live
 from rich.panel import Panel
-from rich.progress import BarColumn, Progress, SpinnerColumn, TaskProgressColumn, TextColumn, TimeElapsedColumn
+from rich.progress import BarColumn, Progress, SpinnerColumn, TaskID, TaskProgressColumn, TextColumn, TimeElapsedColumn
 from rich.table import Table
 from rich.text import Text
 
-from .models import ArtworkContext, DownloadResult
+from .models import ArtworkContext, BatchRunResult, BatchSnapshot, BatchTask, DownloadResult
 
 
 class Reporter:
@@ -18,6 +18,9 @@ class Reporter:
         pass
 
     def batch_started(self, total: int) -> None:
+        pass
+
+    def batch_updated(self, snapshot: BatchSnapshot) -> None:
         pass
 
     def artwork_started(self, context: ArtworkContext) -> None:
@@ -32,7 +35,13 @@ class Reporter:
     def artwork_finished(self, result: DownloadResult) -> None:
         pass
 
-    def batch_finished(self, results: list[DownloadResult]) -> None:
+    def task_skipped(self, task: BatchTask) -> None:
+        pass
+
+    def task_failed(self, task: BatchTask) -> None:
+        pass
+
+    def batch_finished(self, run_result: BatchRunResult) -> None:
         pass
 
     def close(self) -> None:
@@ -51,9 +60,10 @@ class RichCliReporter(Reporter):
             console=self.console,
             transient=False,
         )
-        self.overall_task_id: int | None = None
-        self.tile_task_id: int | None = None
+        self.overall_task_id: TaskID | None = None
+        self.tile_task_id: TaskID | None = None
         self.current_tile_total = 0
+        self.last_snapshot: BatchSnapshot | None = None
 
     def log(self, message: str) -> None:
         self.console.print(f"[cyan]•[/cyan] {message}")
@@ -61,6 +71,15 @@ class RichCliReporter(Reporter):
     def batch_started(self, total: int) -> None:
         self.progress.start()
         self.overall_task_id = self.progress.add_task("Total artworks", total=total)
+
+    def batch_updated(self, snapshot: BatchSnapshot) -> None:
+        self.last_snapshot = snapshot
+        if self.overall_task_id is not None:
+            self.progress.update(
+                self.overall_task_id,
+                completed=snapshot.succeeded + snapshot.failed + snapshot.skipped,
+                total=snapshot.total,
+            )
 
     def artwork_started(self, context: ArtworkContext) -> None:
         description = f"[{context.index}/{context.total}] {context.page.title[:60]}"
@@ -84,15 +103,28 @@ class RichCliReporter(Reporter):
     def artwork_finished(self, result: DownloadResult) -> None:
         if self.tile_task_id is not None:
             self.progress.update(self.tile_task_id, completed=self.current_tile_total)
-        if self.overall_task_id is not None:
-            self.progress.advance(self.overall_task_id)
         self.log(f"Saved: {result.output_path}")
+        if result.sidecar_path is not None:
+            self.log(f"Sidecar: {result.sidecar_path}")
 
-    def batch_finished(self, results: list[DownloadResult]) -> None:
-        if self.overall_task_id is not None:
-            self.progress.update(self.overall_task_id, completed=len(results))
+    def task_skipped(self, task: BatchTask) -> None:
+        result = task.result
+        if result is not None:
+            self.log(f"Skipped existing: {result.output_path}")
+            if result.sidecar_path is not None:
+                self.log(f"Existing sidecar: {result.sidecar_path}")
+
+    def task_failed(self, task: BatchTask) -> None:
+        self.log(f"Failed: {task.url} | {task.error}")
+
+    def batch_finished(self, run_result: BatchRunResult) -> None:
         self.progress.stop()
-        self.console.print(f"[bold green]Completed {len(results)} artwork(s).[/bold green]")
+        snapshot = run_result.snapshot
+        style = "bold green" if snapshot.failed == 0 else "bold yellow"
+        self.console.print(
+            f"[{style}]Completed {snapshot.succeeded} succeeded, {snapshot.skipped} skipped, "
+            f"{snapshot.failed} failed, {snapshot.pending} pending.[/{style}]"
+        )
 
 
 class RichTuiReporter(Reporter):
@@ -106,6 +138,10 @@ class RichTuiReporter(Reporter):
         self.current_tiles = "-"
         self.total_artworks = 0
         self.completed_artworks = 0
+        self.skipped_artworks = 0
+        self.failed_artworks = 0
+        self.pending_artworks = 0
+        self.current_tile_total = 0
         self.progress = Progress(
             SpinnerColumn(style="cyan"),
             TextColumn("[bold]{task.description}"),
@@ -115,8 +151,8 @@ class RichTuiReporter(Reporter):
             console=self.console,
             expand=True,
         )
-        self.total_task_id = self.progress.add_task("Artworks", total=1)
-        self.tile_task_id = self.progress.add_task("Tiles", total=1)
+        self.total_task_id: TaskID = self.progress.add_task("Artworks", total=1)
+        self.tile_task_id: TaskID = self.progress.add_task("Tiles", total=1)
         self.live = Live(self.render(), console=self.console, refresh_per_second=8)
         self.live.start()
 
@@ -149,6 +185,9 @@ class RichTuiReporter(Reporter):
         summary.add_row("Image", self.current_size)
         summary.add_row("Tiles", self.current_tiles)
         summary.add_row("Batch", f"{self.completed_artworks}/{self.total_artworks}")
+        summary.add_row("Skipped", str(self.skipped_artworks))
+        summary.add_row("Failed", str(self.failed_artworks))
+        summary.add_row("Pending", str(self.pending_artworks))
 
         logs = Group(*[Text(line) for line in self.logs]) if self.logs else Text("No logs yet.")
 
@@ -160,8 +199,21 @@ class RichTuiReporter(Reporter):
 
     def batch_started(self, total: int) -> None:
         self.total_artworks = total
+        self.pending_artworks = total
         self.progress.update(self.total_task_id, total=total, completed=0)
         self.log_line(f"Batch started: {total} artwork(s)")
+
+    def batch_updated(self, snapshot: BatchSnapshot) -> None:
+        self.completed_artworks = snapshot.succeeded
+        self.skipped_artworks = snapshot.skipped
+        self.failed_artworks = snapshot.failed
+        self.pending_artworks = snapshot.pending
+        self.progress.update(
+            self.total_task_id,
+            total=snapshot.total,
+            completed=snapshot.succeeded + snapshot.failed + snapshot.skipped,
+        )
+        self.live.update(self.render())
 
     def artwork_started(self, context: ArtworkContext) -> None:
         self.current_status = f"Downloading [{context.index}/{context.total}]"
@@ -173,6 +225,7 @@ class RichTuiReporter(Reporter):
             f" ({context.tile_info.highest_level.num_tiles_x * context.tile_info.highest_level.num_tiles_y} total)"
         )
         total_tiles = context.tile_info.highest_level.num_tiles_x * context.tile_info.highest_level.num_tiles_y
+        self.current_tile_total = total_tiles
         self.progress.update(self.tile_task_id, description="Tiles", total=total_tiles, completed=0)
         self.log_line(f"Start: {context.page.title}")
 
@@ -182,19 +235,34 @@ class RichTuiReporter(Reporter):
 
     def stitching_started(self) -> None:
         self.current_status = "Stitching"
-        self.progress.update(self.tile_task_id, description="Stitching", completed=self.progress.tasks[self.tile_task_id].total)
+        self.progress.update(self.tile_task_id, description="Stitching", completed=self.current_tile_total)
         self.log_line("All tiles downloaded, stitching image")
 
     def artwork_finished(self, result: DownloadResult) -> None:
-        self.completed_artworks += 1
         self.current_status = "Saved"
-        self.progress.advance(self.total_task_id)
         self.log_line(f"Saved: {result.output_path}")
+        if result.sidecar_path is not None:
+            self.log_line(f"Sidecar: {result.sidecar_path}")
         self.live.update(self.render())
 
-    def batch_finished(self, results: list[DownloadResult]) -> None:
+    def task_skipped(self, task: BatchTask) -> None:
+        self.current_status = "Skipped"
+        if task.result is not None:
+            self.log_line(f"Skipped existing: {task.result.output_path}")
+            if task.result.sidecar_path is not None:
+                self.log_line(f"Existing sidecar: {task.result.sidecar_path}")
+        self.live.update(self.render())
+
+    def task_failed(self, task: BatchTask) -> None:
+        self.current_status = "Failed"
+        self.log_line(f"Failed: {task.url} | {task.error}")
+
+    def batch_finished(self, run_result: BatchRunResult) -> None:
         self.current_status = "Completed"
-        self.log_line(f"Finished {len(results)} artwork(s)")
+        self.log_line(
+            f"Finished {run_result.snapshot.succeeded} succeeded, {run_result.snapshot.skipped} skipped, "
+            f"{run_result.snapshot.failed} failed"
+        )
         self.live.update(self.render())
 
     def close(self) -> None:

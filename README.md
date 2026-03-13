@@ -9,6 +9,11 @@
 - `--tui` 实时终端面板
 - 多个 URL 批量下载
 - `--url-file` 从文件读取 URL
+- 页面、元数据、瓦片请求自动重试
+- 批量任务状态跟踪和失败汇总
+- 已存在文件默认跳过
+- 可选将作品元数据写入 JPEG EXIF
+- 可选输出同名 JSON sidecar 元数据文件
 
 ## 安装
 
@@ -48,6 +53,48 @@ uv run googleart-download \
 
 ```bash
 uv run googleart-download --url-file urls.txt --tui
+```
+
+重试参数：
+
+```bash
+uv run googleart-download "https://artsandculture.google.com/asset/..." --retries 5 --retry-backoff 1.0
+```
+
+批量失败时继续处理后续任务：
+
+```bash
+uv run googleart-download --url-file urls.txt
+```
+
+批量失败时立刻停止：
+
+```bash
+uv run googleart-download --url-file urls.txt --fail-fast
+```
+
+默认会跳过已经存在的目标文件。如果你需要强制重新下载：
+
+```bash
+uv run googleart-download --url-file urls.txt --no-skip-existing
+```
+
+默认不会修改图片 EXIF。如果你需要把作品信息写入输出 JPEG：
+
+```bash
+uv run googleart-download "https://artsandculture.google.com/asset/..." --write-metadata
+```
+
+如果你需要结构化元数据文件：
+
+```bash
+uv run googleart-download "https://artsandculture.google.com/asset/..." --write-sidecar
+```
+
+如果你两者都要：
+
+```bash
+uv run googleart-download "https://artsandculture.google.com/asset/..." --write-metadata --write-sidecar
 ```
 
 ## 说明
