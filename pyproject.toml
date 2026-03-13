@@ -1,0 +1,21 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "googleart-download"
+version = "0.1.0"
+description = "Download high-resolution Google Arts & Culture images by stitching tiles"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "pillow>=11.1.0,<12",
+    "pycryptodome>=3.23.0,<4",
+    "rich>=14.1.0,<15",
+]
+
+[project.scripts]
+googleart-download = "googleart_download.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/googleart_download"]
