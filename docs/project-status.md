@@ -12,6 +12,8 @@ The project currently supports:
 - rich TUI dashboard via `--tui`
 - request-level retries with backoff
 - batch-level failed task reruns via `--rerun-failures`
+- user-friendly size selection via `--size` and `--max-dimension`
+- size inspection via `--list-sizes`
 - skip-existing behavior by default, with `--no-skip-existing` override
 - single-artwork tile cache reuse across reruns
 - conservative memory guard before stitching extremely large images
@@ -72,6 +74,7 @@ Metadata domain:
   - tile rate
   - retry counters
   - phase display
+- refine size preset thresholds if real-world usage suggests better defaults
 - expand test coverage for:
   - download flow integration
   - EXIF writing

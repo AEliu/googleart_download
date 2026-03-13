@@ -11,6 +11,8 @@
 - `--url-file` 从文件读取 URL
 - 页面、元数据、瓦片请求自动重试
 - 批量任务状态跟踪和失败汇总
+- 用户友好的尺寸选择：`--size` / `--max-dimension`
+- 先查看可选尺寸：`--list-sizes`
 - 已存在文件默认跳过
 - 单作品 tile 缓存和中断后自动复用
 - 超大图拼接前的内存风险保护
@@ -84,6 +86,27 @@ uv run googleart-download "https://artsandculture.google.com/asset/..." --retrie
 uv run googleart-download --url-file urls.txt --rerun-failures 1
 ```
 
+先查看这张作品有哪些可选尺寸：
+
+```bash
+uv run googleart-download "https://artsandculture.google.com/asset/..." --list-sizes
+```
+
+按用户友好的预设尺寸下载：
+
+```bash
+uv run googleart-download "https://artsandculture.google.com/asset/..." --size preview
+uv run googleart-download "https://artsandculture.google.com/asset/..." --size medium
+uv run googleart-download "https://artsandculture.google.com/asset/..." --size large
+uv run googleart-download "https://artsandculture.google.com/asset/..." --size max
+```
+
+按最长边限制下载：
+
+```bash
+uv run googleart-download "https://artsandculture.google.com/asset/..." --max-dimension 8000
+```
+
 批量失败时继续处理后续任务：
 
 ```bash
@@ -134,6 +157,9 @@ uv run googleart-download "https://artsandculture.google.com/asset/..." --stitch
 - 程序当前面向单张作品页，不处理整个合集或故事页。
 - 下载时会把单张作品的 tile 临时缓存到输出目录下的 `.googleart-cache/`。如果下载过程中中断，下次运行会自动复用已经完成的 tile。
 - 单张作品成功写出后，会默认清理对应的 tile 缓存；失败时缓存会保留，便于恢复。
+- `--size` 是用户友好的语义化尺寸预设；`--max-dimension` 则允许你直接控制最长边上限。
+- 默认仍然是 `--size max`，也就是下载当前可用的最大尺寸。
+- `--list-sizes` 不会开始下载图片，只会读取页面和瓦片元数据，列出当前作品可选的层级尺寸和 tile 数。
 - `--stitch-backend auto` 会优先使用 Pillow；当图像过大、不适合安全内存拼接时，会切到 `pyvips`。
 - 如果系统没有可用的 `pyvips/libvips`，超大图会明确报错并提示安装，而不是继续把机器顶死。
 - 当前 `pyvips` 路径还不支持写 JPEG EXIF。超大图场景下如果需要元数据，优先使用 `--write-sidecar`。

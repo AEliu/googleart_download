@@ -5,7 +5,16 @@ from pathlib import Path
 
 from .download.downloader import download_artwork
 from .errors import DownloadError
-from .models import BatchRunResult, BatchSnapshot, BatchTask, DownloadResult, RetryConfig, StitchBackend, TaskState
+from .models import (
+    BatchRunResult,
+    BatchSnapshot,
+    BatchTask,
+    DownloadResult,
+    DownloadSize,
+    RetryConfig,
+    StitchBackend,
+    TaskState,
+)
 from .reporters import Reporter
 
 
@@ -20,6 +29,8 @@ class BatchDownloadManager:
         retry_config: RetryConfig,
         reporter: Reporter,
         fail_fast: bool,
+        download_size: DownloadSize,
+        max_dimension: int | None,
         skip_existing: bool,
         write_metadata: bool,
         write_sidecar: bool,
@@ -33,6 +44,8 @@ class BatchDownloadManager:
         self.retry_config = retry_config
         self.reporter = reporter
         self.fail_fast = fail_fast
+        self.download_size = download_size
+        self.max_dimension = max_dimension
         self.skip_existing = skip_existing
         self.write_metadata = write_metadata
         self.write_sidecar = write_sidecar
@@ -71,6 +84,8 @@ class BatchDownloadManager:
                         filename=self.filename,
                         workers=self.workers,
                         retry_config=self.retry_config,
+                        download_size=self.download_size,
+                        max_dimension=self.max_dimension,
                         skip_existing=self.skip_existing,
                         write_metadata=self.write_metadata,
                         write_sidecar=self.write_sidecar,

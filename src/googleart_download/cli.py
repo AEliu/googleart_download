@@ -8,9 +8,10 @@ from rich.console import Console
 from rich.table import Table
 
 from .batch import BatchDownloadManager
+from .download.downloader import inspect_artwork_sizes
 from .errors import DownloadError
 from .logging_utils import configure_logging
-from .models import BatchRunResult, RetryConfig, StitchBackend
+from .models import BatchRunResult, DownloadSize, RetryConfig, SizeOption, StitchBackend
 from .reporters import build_reporter
 
 
@@ -66,6 +67,18 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="download again even if the target file already exists",
     )
+    size_group = parser.add_mutually_exclusive_group()
+    size_group.add_argument(
+        "--size",
+        choices=[size.value for size in DownloadSize],
+        default=DownloadSize.MAX.value,
+        help="download size preset: preview, medium, large, or max (default: max)",
+    )
+    size_group.add_argument(
+        "--max-dimension",
+        type=int,
+        help="choose the largest available level whose longest edge does not exceed this size",
+    )
     parser.add_argument(
         "--write-metadata",
         action="store_true",
@@ -81,6 +94,11 @@ def parse_args() -> argparse.Namespace:
         choices=[backend.value for backend in StitchBackend],
         default=StitchBackend.AUTO.value,
         help="image stitch backend: auto, pillow, or pyvips (default: auto)",
+    )
+    parser.add_argument(
+        "--list-sizes",
+        action="store_true",
+        help="inspect available download sizes for a single artwork URL and exit",
     )
     parser.add_argument("--tui", action="store_true", help="show a richer live terminal dashboard")
     parser.add_argument("--log-file", help="write logs to a file")
@@ -114,7 +132,29 @@ def collect_urls(args: argparse.Namespace) -> list[str]:
     if args.rerun_failures < 0:
         raise DownloadError("--rerun-failures must be >= 0")
 
+    if args.max_dimension is not None and args.max_dimension < 1:
+        raise DownloadError("--max-dimension must be at least 1")
+
     return urls
+
+
+def render_size_options(title: str, options: list[SizeOption]) -> None:
+    console = Console()
+    table = Table(title=f"Available Sizes: {title}", header_style="bold cyan")
+    table.add_column("Level")
+    table.add_column("Size", justify="right")
+    table.add_column("Tiles", justify="right")
+    table.add_column("Longest Edge", justify="right")
+
+    for option in options:
+        table.add_row(
+            str(option.level.z),
+            f"{option.width}x{option.height}",
+            str(option.tile_count),
+            str(max(option.width, option.height)),
+        )
+
+    console.print(table)
 
 
 def render_summary(run_result: BatchRunResult) -> None:
@@ -160,6 +200,12 @@ def main() -> int:
 
     try:
         urls = collect_urls(args)
+        if args.list_sizes:
+            if len(urls) != 1:
+                raise DownloadError("--list-sizes requires exactly one artwork URL")
+            title, options = inspect_artwork_sizes(urls[0], retry_config)
+            render_size_options(title, options)
+            return 0
         manager = BatchDownloadManager(
             urls=urls,
             output_dir=Path(args.output_dir),
@@ -168,6 +214,8 @@ def main() -> int:
             retry_config=retry_config,
             reporter=reporter,
             fail_fast=args.fail_fast,
+            download_size=DownloadSize(args.size),
+            max_dimension=args.max_dimension,
             skip_existing=not args.no_skip_existing,
             write_metadata=args.write_metadata,
             write_sidecar=args.write_sidecar,

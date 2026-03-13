@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 from googleart_download.batch import BatchDownloadManager
 from googleart_download.errors import DownloadError
-from googleart_download.models import DownloadResult, RetryConfig, TaskState
+from googleart_download.models import DownloadResult, DownloadSize, RetryConfig, TaskState
 from googleart_download.reporters import Reporter
 
 
@@ -41,6 +41,8 @@ class BatchManagerTests(unittest.TestCase):
                 retry_config=RetryConfig(attempts=1),
                 reporter=SilentReporter(),
                 fail_fast=False,
+                download_size=DownloadSize.MAX,
+                max_dimension=None,
                 skip_existing=False,
                 write_metadata=False,
                 write_sidecar=False,
@@ -75,6 +77,8 @@ class BatchManagerTests(unittest.TestCase):
                 retry_config=RetryConfig(attempts=1),
                 reporter=SilentReporter(),
                 fail_fast=True,
+                download_size=DownloadSize.MAX,
+                max_dimension=None,
                 skip_existing=False,
                 write_metadata=False,
                 write_sidecar=False,

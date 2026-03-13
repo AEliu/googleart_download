@@ -11,7 +11,7 @@ from Crypto.Cipher import AES
 
 from ..constants import AES_IV, AES_KEY, ENCRYPTION_MARKER, SIGNING_KEY
 from ..errors import DownloadError
-from ..models import PageInfo, TileInfo, TileJob
+from ..models import PageInfo, PyramidLevel, TileInfo, TileJob
 from ..reporters import Reporter
 from .cache import tile_cache_path
 from .http_client import HttpClient
@@ -51,10 +51,9 @@ def decrypt_tile_if_needed(data: bytes) -> bytes:
     return header + decrypted + footer
 
 
-def build_jobs(page: PageInfo, tile_info: TileInfo) -> list[TileJob]:
-    level = tile_info.highest_level
+def build_jobs(page: PageInfo, tile_info: TileInfo, level: PyramidLevel) -> list[TileJob]:
     return [
-        TileJob(x=x, y=y, url=build_tile_url(page, x, y, level.z))
+        TileJob(z=level.z, x=x, y=y, url=build_tile_url(page, x, y, level.z))
         for y in range(level.num_tiles_y)
         for x in range(level.num_tiles_x)
     ]

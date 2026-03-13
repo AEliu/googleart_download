@@ -140,7 +140,19 @@ Examples:
 - cache retention should be controlled by flags
 - overwrite behavior should be explicit
 
-### 3. Separate bottlenecks
+### 3. User-friendly size control
+
+The downloader should not force every user into the maximum artwork size.
+
+Preferred UX:
+
+- semantic size presets such as `preview`, `medium`, `large`, and `max`
+- an explicit longest-edge cap for users who want more control
+- a lightweight inspection mode to show available levels before downloading
+
+The CLI should stay user-friendly and avoid exposing raw pyramid levels as the primary interface.
+
+### 4. Separate bottlenecks
 
 Large-artwork performance must be treated as three different concerns:
 

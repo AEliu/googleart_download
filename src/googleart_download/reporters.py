@@ -83,13 +83,14 @@ class RichCliReporter(Reporter):
 
     def artwork_started(self, context: ArtworkContext) -> None:
         description = f"[{context.index}/{context.total}] {context.page.title[:60]}"
-        total_tiles = context.tile_info.highest_level.num_tiles_x * context.tile_info.highest_level.num_tiles_y
+        total_tiles = context.selected_level.tile_count
         self.current_tile_total = total_tiles
         self.tile_task_id = self.progress.add_task(description, total=total_tiles)
         self.log(f"Output: {context.output_path}")
         self.log(
-            f"Image: {context.tile_info.image_width}x{context.tile_info.image_height}, "
-            f"tiles: {context.tile_info.highest_level.num_tiles_x}x{context.tile_info.highest_level.num_tiles_y}"
+            f"Image: {context.tile_info.image_width_for(context.selected_level)}x"
+            f"{context.tile_info.image_height_for(context.selected_level)}, "
+            f"tiles: {context.selected_level.num_tiles_x}x{context.selected_level.num_tiles_y}"
         )
 
     def tile_advanced(self, completed: int, total: int) -> None:
@@ -221,12 +222,15 @@ class RichTuiReporter(Reporter):
         self.current_status = f"Downloading [{context.index}/{context.total}]"
         self.current_title = context.page.title
         self.current_output = str(context.output_path)
-        self.current_size = f"{context.tile_info.image_width}x{context.tile_info.image_height}"
-        self.current_tiles = (
-            f"{context.tile_info.highest_level.num_tiles_x}x{context.tile_info.highest_level.num_tiles_y}"
-            f" ({context.tile_info.highest_level.num_tiles_x * context.tile_info.highest_level.num_tiles_y} total)"
+        self.current_size = (
+            f"{context.tile_info.image_width_for(context.selected_level)}x"
+            f"{context.tile_info.image_height_for(context.selected_level)}"
         )
-        total_tiles = context.tile_info.highest_level.num_tiles_x * context.tile_info.highest_level.num_tiles_y
+        self.current_tiles = (
+            f"{context.selected_level.num_tiles_x}x{context.selected_level.num_tiles_y}"
+            f" ({context.selected_level.tile_count} total)"
+        )
+        total_tiles = context.selected_level.tile_count
         self.current_tile_total = total_tiles
         self.progress.update(self.tile_task_id, description="Tiles", total=total_tiles, completed=0)
         self.log_line(f"Start: {context.page.title}")

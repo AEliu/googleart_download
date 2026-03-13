@@ -25,7 +25,7 @@ def ensure_cache_layout(cache_dir: Path) -> Path:
 
 
 def tile_cache_path(tiles_dir: Path, job: TileJob) -> Path:
-    return tiles_dir / f"{job.x}-{job.y}.tile"
+    return tiles_dir / f"{job.z}-{job.x}-{job.y}.tile"
 
 
 def write_cache_state(

@@ -29,6 +29,16 @@ class PyramidLevel:
     empty_pels_x: int
     empty_pels_y: int
 
+    def image_width(self, tile_width: int) -> int:
+        return tile_width * self.num_tiles_x - self.empty_pels_x
+
+    def image_height(self, tile_height: int) -> int:
+        return tile_height * self.num_tiles_y - self.empty_pels_y
+
+    @property
+    def tile_count(self) -> int:
+        return self.num_tiles_x * self.num_tiles_y
+
 
 @dataclass(frozen=True)
 class TileInfo:
@@ -43,16 +53,23 @@ class TileInfo:
     @property
     def image_width(self) -> int:
         level = self.highest_level
-        return self.tile_width * level.num_tiles_x - level.empty_pels_x
+        return level.image_width(self.tile_width)
 
     @property
     def image_height(self) -> int:
         level = self.highest_level
-        return self.tile_height * level.num_tiles_y - level.empty_pels_y
+        return level.image_height(self.tile_height)
+
+    def image_width_for(self, level: PyramidLevel) -> int:
+        return level.image_width(self.tile_width)
+
+    def image_height_for(self, level: PyramidLevel) -> int:
+        return level.image_height(self.tile_height)
 
 
 @dataclass(frozen=True)
 class TileJob:
+    z: int
     x: int
     y: int
     url: str
@@ -65,6 +82,7 @@ class ArtworkContext:
     url: str
     page: PageInfo
     tile_info: TileInfo
+    selected_level: PyramidLevel
     output_path: Path
 
 
@@ -111,6 +129,22 @@ class StitchBackend(str, Enum):
     AUTO = "auto"
     PILLOW = "pillow"
     PYVIPS = "pyvips"
+
+
+class DownloadSize(str, Enum):
+    PREVIEW = "preview"
+    MEDIUM = "medium"
+    LARGE = "large"
+    MAX = "max"
+
+
+@dataclass(frozen=True)
+class SizeOption:
+    label: str
+    level: PyramidLevel
+    width: int
+    height: int
+    tile_count: int
 
 
 @dataclass(frozen=True)
