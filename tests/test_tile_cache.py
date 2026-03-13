@@ -6,7 +6,9 @@ from tempfile import TemporaryDirectory
 
 from PIL import Image
 
-from googleart_download.download.cache import ensure_cache_layout
+import json
+
+from googleart_download.download.cache import ensure_cache_layout, resolve_artwork_cache_dir
 from googleart_download.download.image_writer import (
     build_temp_output_path,
     choose_stitch_backend,
@@ -171,6 +173,50 @@ class TileCacheTests(unittest.TestCase):
     def test_build_temp_output_path_preserves_image_extension(self) -> None:
         path = build_temp_output_path(Path("/tmp/The Starry Night.preview.jpg"))
         self.assertEqual(path.name, "The Starry Night.preview.part.jpg")
+
+    def test_resolve_artwork_cache_dir_uses_stable_asset_url(self) -> None:
+        with TemporaryDirectory() as tmpdir:
+            output_dir = Path(tmpdir)
+            output_path = output_dir / "art.jpg"
+            first = resolve_artwork_cache_dir(
+                output_dir,
+                "https://artsandculture.google.com/asset/foo/bgEuwDxel93-Pg",
+                output_path,
+            )
+            second = resolve_artwork_cache_dir(
+                output_dir,
+                "https://artsandculture.google.com/asset/foo/bgEuwDxel93-Pg",
+                output_path,
+            )
+
+        self.assertEqual(first, second)
+
+    def test_resolve_artwork_cache_dir_migrates_legacy_cache_by_output_path(self) -> None:
+        with TemporaryDirectory() as tmpdir:
+            output_dir = Path(tmpdir)
+            output_path = output_dir / "art.jpg"
+            legacy_dir = output_dir / ".googleart-cache" / "legacy-random"
+            tiles_dir = ensure_cache_layout(legacy_dir)
+            (tiles_dir / "7-0-0.tile").write_bytes(b"tile")
+            (legacy_dir / "state.json").write_text(
+                json.dumps(
+                    {
+                        "output_path": str(output_path),
+                        "completed_tiles": 123,
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            resolved = resolve_artwork_cache_dir(
+                output_dir,
+                "https://artsandculture.google.com/asset/foo/bgEuwDxel93-Pg",
+                output_path,
+            )
+
+            self.assertTrue(resolved.exists())
+            self.assertTrue((resolved / "tiles" / "7-0-0.tile").exists())
+            self.assertNotEqual(resolved.name, "legacy-random")
 
 
 if __name__ == "__main__":

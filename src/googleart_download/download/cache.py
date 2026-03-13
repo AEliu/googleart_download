@@ -11,11 +11,61 @@ from ..models import PageInfo, TileInfo, TileJob
 CACHE_SCHEMA_VERSION = 1
 
 
-def resolve_artwork_cache_dir(output_dir: Path, page: PageInfo) -> Path:
-    asset_id = page.base_url.rstrip("/").rsplit("/", 1)[-1]
+def _stable_cache_dir(output_dir: Path, asset_url: str) -> Path:
+    asset_id = asset_url.rstrip("/").rsplit("/", 1)[-1]
     safe_asset_id = re.sub(r"[^A-Za-z0-9._-]+", "_", asset_id) or "artwork"
-    identity = sha1(page.base_url.encode("utf-8")).hexdigest()[:12]
+    identity = sha1(asset_url.encode("utf-8")).hexdigest()[:12]
     return output_dir / ".googleart-cache" / f"{safe_asset_id}-{identity}"
+
+
+def _read_cache_state(cache_dir: Path) -> dict[str, object] | None:
+    state_path = cache_dir / "state.json"
+    if not state_path.exists():
+        return None
+    try:
+        payload = json.loads(state_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def _find_legacy_cache_dir(output_dir: Path, output_path: Path) -> Path | None:
+    cache_root = output_dir / ".googleart-cache"
+    if not cache_root.exists():
+        return None
+
+    best_match: tuple[int, Path] | None = None
+    for candidate in cache_root.iterdir():
+        if not candidate.is_dir():
+            continue
+        state = _read_cache_state(candidate)
+        if state is None:
+            continue
+        if state.get("output_path") != str(output_path):
+            continue
+        completed_tiles = state.get("completed_tiles")
+        completed = completed_tiles if isinstance(completed_tiles, int) else -1
+        if best_match is None or completed > best_match[0]:
+            best_match = (completed, candidate)
+
+    return best_match[1] if best_match is not None else None
+
+
+def resolve_artwork_cache_dir(output_dir: Path, asset_url: str, output_path: Path) -> Path:
+    stable_dir = _stable_cache_dir(output_dir, asset_url)
+    if stable_dir.exists():
+        return stable_dir
+
+    legacy_dir = _find_legacy_cache_dir(output_dir, output_path)
+    if legacy_dir is None:
+        return stable_dir
+
+    stable_dir.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        legacy_dir.replace(stable_dir)
+        return stable_dir
+    except OSError:
+        return legacy_dir
 
 
 def ensure_cache_layout(cache_dir: Path) -> Path:

@@ -69,7 +69,7 @@ def download_artwork(
     tile_info = parse_tile_info(http_client.fetch_bytes(page.tile_info_url, description="tile metadata"))
     selected_level = select_download_level(tile_info, size=download_size, max_dimension=max_dimension)
     selected_tile_info = TileInfo(tile_width=tile_info.tile_width, tile_height=tile_info.tile_height, levels=[selected_level])
-    cache_dir = resolve_artwork_cache_dir(output_dir, page)
+    cache_dir = resolve_artwork_cache_dir(output_dir, asset_url, output_path)
     tiles_dir = ensure_cache_layout(cache_dir)
 
     context = ArtworkContext(
@@ -85,6 +85,9 @@ def download_artwork(
 
     jobs = build_jobs(page, tile_info, selected_level)
     cached_tiles = sum(1 for job in jobs if tile_cache_path(tiles_dir, job).exists())
+    if cached_tiles:
+        reporter.log(f"Cache directory: {cache_dir}")
+        reporter.log(f"Cached tiles available: {cached_tiles}/{len(jobs)}")
     logger.info(
         "Artwork metadata: title=%s size=%sx%s tiles=%s level=%s",
         page.title,

@@ -63,6 +63,7 @@ class RichCliReporter(Reporter):
         self.overall_task_id: TaskID | None = None
         self.tile_task_id: TaskID | None = None
         self.current_tile_total = 0
+        self.stitching_in_progress = False
         self.last_snapshot: BatchSnapshot | None = None
 
     def log(self, message: str) -> None:
@@ -85,6 +86,7 @@ class RichCliReporter(Reporter):
         description = f"[{context.index}/{context.total}] {context.page.title[:60]}"
         total_tiles = context.selected_level.tile_count
         self.current_tile_total = total_tiles
+        self.stitching_in_progress = False
         self.tile_task_id = self.progress.add_task(description, total=total_tiles)
         self.log(f"Output: {context.output_path}")
         self.log(
@@ -99,11 +101,15 @@ class RichCliReporter(Reporter):
 
     def stitching_started(self) -> None:
         if self.tile_task_id is not None:
-            self.progress.update(self.tile_task_id, description="Stitching image", completed=self.current_tile_total)
+            self.stitching_in_progress = True
+            self.progress.update(self.tile_task_id, description="Stitching image", completed=0, total=1)
 
     def artwork_finished(self, result: DownloadResult) -> None:
         if self.tile_task_id is not None:
-            self.progress.update(self.tile_task_id, completed=self.current_tile_total)
+            if self.stitching_in_progress:
+                self.progress.update(self.tile_task_id, completed=1, total=1)
+            else:
+                self.progress.update(self.tile_task_id, completed=self.current_tile_total)
         self.log(f"Saved: {result.output_path}")
         if result.sidecar_path is not None:
             self.log(f"Sidecar: {result.sidecar_path}")
@@ -116,6 +122,8 @@ class RichCliReporter(Reporter):
                 self.log(f"Existing sidecar: {result.sidecar_path}")
 
     def task_failed(self, task: BatchTask) -> None:
+        if self.tile_task_id is not None and self.stitching_in_progress:
+            self.progress.update(self.tile_task_id, description="Stitching failed", completed=0, total=1)
         self.log(f"Failed: {task.url} | {task.error}")
 
     def batch_finished(self, run_result: BatchRunResult) -> None:
@@ -145,6 +153,7 @@ class RichTuiReporter(Reporter):
         self.failed_artworks = 0
         self.pending_artworks = 0
         self.current_tile_total = 0
+        self.stitching_in_progress = False
         self.progress = Progress(
             SpinnerColumn(style="cyan"),
             TextColumn("[bold]{task.description}"),
@@ -232,6 +241,7 @@ class RichTuiReporter(Reporter):
         )
         total_tiles = context.selected_level.tile_count
         self.current_tile_total = total_tiles
+        self.stitching_in_progress = False
         self.progress.update(self.tile_task_id, description="Tiles", total=total_tiles, completed=0)
         self.log_line(f"Start: {context.page.title}")
 
@@ -241,11 +251,14 @@ class RichTuiReporter(Reporter):
 
     def stitching_started(self) -> None:
         self.current_status = "Stitching"
-        self.progress.update(self.tile_task_id, description="Stitching", completed=self.current_tile_total)
+        self.stitching_in_progress = True
+        self.progress.update(self.tile_task_id, description="Stitching", completed=0, total=1)
         self.log_line("All tiles downloaded, stitching image")
 
     def artwork_finished(self, result: DownloadResult) -> None:
         self.current_status = "Saved"
+        if self.stitching_in_progress:
+            self.progress.update(self.tile_task_id, description="Stitching", completed=1, total=1)
         self.log_line(f"Saved: {result.output_path}")
         if result.sidecar_path is not None:
             self.log_line(f"Sidecar: {result.sidecar_path}")
@@ -261,6 +274,8 @@ class RichTuiReporter(Reporter):
 
     def task_failed(self, task: BatchTask) -> None:
         self.current_status = "Failed"
+        if self.stitching_in_progress:
+            self.progress.update(self.tile_task_id, description="Stitching failed", completed=0, total=1)
         self.log_line(f"Failed: {task.url} | {task.error}")
 
     def batch_finished(self, run_result: BatchRunResult) -> None:

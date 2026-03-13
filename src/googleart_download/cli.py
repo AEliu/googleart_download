@@ -9,7 +9,7 @@ from rich.table import Table
 
 from .batch import BatchDownloadManager
 from .download.downloader import inspect_artwork_sizes
-from .errors import DownloadError
+from .errors import DownloadError, build_error_guidance
 from .logging_utils import configure_logging
 from .models import BatchRunResult, DownloadSize, RetryConfig, SizeOption, StitchBackend
 from .reporters import build_reporter
@@ -224,7 +224,10 @@ def main() -> int:
         )
         run_result = manager.run()
     except DownloadError as exc:
-        Console(stderr=True).print(f"[bold red]Error:[/bold red] {exc}")
+        console = Console(stderr=True)
+        console.print(f"[bold red]Error:[/bold red] {exc}")
+        for line in build_error_guidance(str(exc)):
+            console.print(f"[yellow]Hint:[/yellow] {line}")
         return 1
     finally:
         reporter.close()

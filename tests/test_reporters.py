@@ -1,0 +1,76 @@
+from __future__ import annotations
+
+import unittest
+from pathlib import Path
+
+from googleart_download.models import (
+    ArtworkContext,
+    ArtworkMetadata,
+    BatchTask,
+    DownloadResult,
+    PageInfo,
+    PyramidLevel,
+    TaskState,
+    TileInfo,
+)
+from googleart_download.reporters import RichCliReporter
+
+
+class ReporterTests(unittest.TestCase):
+    def make_context(self) -> ArtworkContext:
+        level = PyramidLevel(z=4, num_tiles_x=3, num_tiles_y=2, empty_pels_x=0, empty_pels_y=0)
+        tile_info = TileInfo(tile_width=256, tile_height=256, levels=[level])
+        return ArtworkContext(
+            index=1,
+            total=1,
+            url="https://example.com/art",
+            page=PageInfo(title="Artwork", base_url="https://example.com/base", token="", metadata=ArtworkMetadata()),
+            tile_info=tile_info,
+            selected_level=level,
+            output_path=Path("/tmp/art.jpg"),
+        )
+
+    def test_cli_reporter_uses_separate_stitching_stage_progress(self) -> None:
+        reporter = RichCliReporter()
+        reporter.batch_started(1)
+        reporter.artwork_started(self.make_context())
+        assert reporter.tile_task_id is not None
+
+        reporter.tile_advanced(6, 6)
+        reporter.stitching_started()
+        task = reporter.progress.tasks[reporter.tile_task_id]
+        self.assertEqual(task.description, "Stitching image")
+        self.assertEqual(task.completed, 0)
+        self.assertEqual(task.total, 1)
+
+        reporter.artwork_finished(
+            DownloadResult(
+                url="https://example.com/art",
+                output_path=Path("/tmp/art.jpg"),
+                title="Artwork",
+                size=(768, 512),
+                tile_count=6,
+            )
+        )
+        task = reporter.progress.tasks[reporter.tile_task_id]
+        self.assertEqual(task.completed, 1)
+        self.assertEqual(task.total, 1)
+
+    def test_cli_reporter_marks_failed_stitching_without_100_percent(self) -> None:
+        reporter = RichCliReporter()
+        reporter.batch_started(1)
+        reporter.artwork_started(self.make_context())
+        assert reporter.tile_task_id is not None
+
+        reporter.tile_advanced(6, 6)
+        reporter.stitching_started()
+        reporter.task_failed(BatchTask(index=1, url="https://example.com/art", state=TaskState.FAILED, error="boom"))
+
+        task = reporter.progress.tasks[reporter.tile_task_id]
+        self.assertEqual(task.description, "Stitching failed")
+        self.assertEqual(task.completed, 0)
+        self.assertEqual(task.total, 1)
+
+
+if __name__ == "__main__":
+    unittest.main()
