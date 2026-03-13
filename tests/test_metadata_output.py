@@ -5,8 +5,9 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from googleart_download.core import metadata_to_dict, parse_artwork_metadata, write_metadata_sidecar
+from googleart_download.metadata import metadata_to_dict, write_metadata_sidecar
 from googleart_download.models import ArtworkMetadata
+from googleart_download.metadata.parsers import parse_artwork_metadata
 
 
 class MetadataOutputTests(unittest.TestCase):

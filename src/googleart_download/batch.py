@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import replace
 from pathlib import Path
 
-from .core import download_artwork
+from .download.downloader import download_artwork
 from .errors import DownloadError
 from .models import BatchRunResult, BatchSnapshot, BatchTask, DownloadResult, RetryConfig, TaskState
 from .reporters import Reporter
