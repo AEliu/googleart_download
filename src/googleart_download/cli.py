@@ -10,7 +10,7 @@ from rich.table import Table
 from .batch import BatchDownloadManager
 from .errors import DownloadError
 from .logging_utils import configure_logging
-from .models import BatchRunResult, RetryConfig
+from .models import BatchRunResult, RetryConfig, StitchBackend
 from .reporters import build_reporter
 
 
@@ -75,6 +75,12 @@ def parse_args() -> argparse.Namespace:
         "--write-sidecar",
         action="store_true",
         help="write artwork metadata to a JSON sidecar next to the image",
+    )
+    parser.add_argument(
+        "--stitch-backend",
+        choices=[backend.value for backend in StitchBackend],
+        default=StitchBackend.AUTO.value,
+        help="image stitch backend: auto, pillow, or pyvips (default: auto)",
     )
     parser.add_argument("--tui", action="store_true", help="show a richer live terminal dashboard")
     parser.add_argument("--log-file", help="write logs to a file")
@@ -165,6 +171,7 @@ def main() -> int:
             skip_existing=not args.no_skip_existing,
             write_metadata=args.write_metadata,
             write_sidecar=args.write_sidecar,
+            stitch_backend=StitchBackend(args.stitch_backend),
             rerun_failures=args.rerun_failures,
         )
         run_result = manager.run()

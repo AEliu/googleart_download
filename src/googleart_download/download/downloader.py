@@ -5,11 +5,11 @@ from pathlib import Path
 from ..logging_utils import get_logger
 from ..metadata.output import write_metadata_sidecar
 from ..metadata.parsers import normalize_asset_url, parse_page_info, parse_tile_info
-from ..models import ArtworkContext, DownloadResult, RetryConfig
+from ..models import ArtworkContext, DownloadResult, RetryConfig, StitchBackend
 from ..reporters import Reporter
 from .cache import clear_cache_dir, ensure_cache_layout, resolve_artwork_cache_dir, tile_cache_path, write_cache_state
 from .http_client import HttpClient
-from .image_writer import resolve_output_path, stitch_tiles
+from .image_writer import choose_stitch_backend, resolve_output_path, stitch_tiles
 from .tiles import build_jobs, download_tiles
 
 
@@ -22,6 +22,7 @@ def download_artwork(
     skip_existing: bool,
     write_metadata: bool,
     write_sidecar: bool,
+    stitch_backend: StitchBackend,
     reporter: Reporter,
     index: int,
     total: int,
@@ -90,8 +91,18 @@ def download_artwork(
         total_tiles=len(jobs),
         stage="stitching",
     )
+    selected_backend = choose_stitch_backend(tile_info, stitch_backend)
+    reporter.log(f"Stitch backend selected: {selected_backend.value}")
     reporter.stitching_started()
-    stitch_tiles(tile_info, tiles, output_path, metadata=page.metadata, write_metadata=write_metadata)
+    selected_backend = stitch_tiles(
+        tile_info,
+        tiles,
+        output_path,
+        metadata=page.metadata,
+        write_metadata=write_metadata,
+        backend=stitch_backend,
+    )
+    reporter.log(f"Stitch backend: {selected_backend.value}")
     sidecar_path = None
     if write_sidecar and page.metadata is not None:
         sidecar_path = write_metadata_sidecar(output_path, page.metadata)

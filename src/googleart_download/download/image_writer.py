@@ -3,11 +3,12 @@ from __future__ import annotations
 import os
 import re
 from pathlib import Path
+from types import ModuleType
 
 from PIL import Image
 
 from ..errors import DownloadError
-from ..models import ArtworkMetadata, TileInfo
+from ..models import ArtworkMetadata, StitchBackend, TileInfo
 from ..metadata.output import build_exif_bytes
 
 
@@ -47,8 +48,20 @@ def _format_bytes(value: int) -> str:
     return f"{size:.1f} TiB"
 
 
+def estimate_stitch_memory_bytes(tile_info: TileInfo) -> int:
+    return tile_info.image_width * tile_info.image_height * 3
+
+
+def has_safe_pillow_memory_budget(tile_info: TileInfo) -> bool:
+    available_bytes = _read_available_memory_bytes()
+    if available_bytes is None:
+        return True
+    safety_budget = int(available_bytes * 0.5)
+    return estimate_stitch_memory_bytes(tile_info) <= safety_budget
+
+
 def ensure_stitch_memory_budget(tile_info: TileInfo) -> None:
-    estimated_bytes = tile_info.image_width * tile_info.image_height * 3
+    estimated_bytes = estimate_stitch_memory_bytes(tile_info)
     available_bytes = _read_available_memory_bytes()
     if available_bytes is None:
         return
@@ -62,12 +75,49 @@ def ensure_stitch_memory_budget(tile_info: TileInfo) -> None:
         )
 
 
-def stitch_tiles(
+def _load_pyvips() -> ModuleType:
+    try:
+        import pyvips  # type: ignore[import-not-found]
+    except Exception as exc:
+        raise DownloadError(
+            "pyvips backend is not available. Install the optional dependency with "
+            "`uv sync --extra large-images` and ensure libvips is installed on the system."
+        ) from exc
+    return pyvips
+
+
+def choose_stitch_backend(tile_info: TileInfo, requested_backend: StitchBackend) -> StitchBackend:
+    if requested_backend is StitchBackend.AUTO:
+        return StitchBackend.PILLOW if has_safe_pillow_memory_budget(tile_info) else StitchBackend.PYVIPS
+    return requested_backend
+
+
+def _save_with_pillow(
+    image: Image.Image,
+    output_path: Path,
+    metadata: ArtworkMetadata | None,
+    write_metadata: bool,
+) -> None:
+    temp_output_path = output_path.with_suffix(output_path.suffix + ".part")
+    try:
+        if write_metadata and metadata is not None:
+            exif_bytes = build_exif_bytes(metadata)
+            image.save(temp_output_path, quality=95, exif=exif_bytes)
+        else:
+            image.save(temp_output_path, quality=95)
+        temp_output_path.replace(output_path)
+    except Exception:
+        if temp_output_path.exists():
+            temp_output_path.unlink()
+        raise
+
+
+def _stitch_with_pillow(
     tile_info: TileInfo,
     tiles: dict[tuple[int, int], Path],
     output_path: Path,
-    metadata: ArtworkMetadata | None = None,
-    write_metadata: bool = False,
+    metadata: ArtworkMetadata | None,
+    write_metadata: bool,
 ) -> None:
     ensure_stitch_memory_budget(tile_info)
     image = Image.new("RGB", (tile_info.image_width, tile_info.image_height))
@@ -85,15 +135,62 @@ def stitch_tiles(
             image.paste(cropped, (left, top))
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
+    _save_with_pillow(image, output_path, metadata, write_metadata)
+
+
+def _stitch_with_pyvips(
+    tile_info: TileInfo,
+    tiles: dict[tuple[int, int], Path],
+    output_path: Path,
+    metadata: ArtworkMetadata | None,
+    write_metadata: bool,
+) -> None:
+    if write_metadata and metadata is not None:
+        raise DownloadError(
+            "EXIF writing is not supported with the pyvips stitch backend yet. "
+            "Use `--write-sidecar`, disable `--write-metadata`, or force `--stitch-backend pillow` for smaller images."
+        )
+
+    pyvips = _load_pyvips()
+    level = tile_info.highest_level
+    rows: list[object] = []
     temp_output_path = output_path.with_suffix(output_path.suffix + ".part")
+
+    for y in range(level.num_tiles_y):
+        row_images: list[object] = []
+        for x in range(level.num_tiles_x):
+            left = x * tile_info.tile_width
+            top = y * tile_info.tile_height
+            tile = pyvips.Image.new_from_file(str(tiles[(x, y)]), access="sequential")
+            width = min(tile.width, tile_info.image_width - left)
+            height = min(tile.height, tile_info.image_height - top)
+            if width != tile.width or height != tile.height:
+                tile = tile.crop(0, 0, width, height)
+            row_images.append(tile)
+        rows.append(pyvips.Image.arrayjoin(row_images, across=len(row_images), shim=0))
+
+    final_image = pyvips.Image.arrayjoin(rows, across=1, shim=0)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
     try:
-        if write_metadata and metadata is not None:
-            exif_bytes = build_exif_bytes(metadata)
-            image.save(temp_output_path, quality=95, exif=exif_bytes)
-        else:
-            image.save(temp_output_path, quality=95)
+        final_image.write_to_file(str(temp_output_path), Q=95, optimize_coding=True, strip=False)
         temp_output_path.replace(output_path)
     except Exception:
         if temp_output_path.exists():
             temp_output_path.unlink()
         raise
+
+
+def stitch_tiles(
+    tile_info: TileInfo,
+    tiles: dict[tuple[int, int], Path],
+    output_path: Path,
+    metadata: ArtworkMetadata | None = None,
+    write_metadata: bool = False,
+    backend: StitchBackend = StitchBackend.AUTO,
+) -> StitchBackend:
+    selected_backend = choose_stitch_backend(tile_info, backend)
+    if selected_backend is StitchBackend.PILLOW:
+        _stitch_with_pillow(tile_info, tiles, output_path, metadata, write_metadata)
+    else:
+        _stitch_with_pyvips(tile_info, tiles, output_path, metadata, write_metadata)
+    return selected_backend

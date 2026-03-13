@@ -15,6 +15,7 @@ The project currently supports:
 - skip-existing behavior by default, with `--no-skip-existing` override
 - single-artwork tile cache reuse across reruns
 - conservative memory guard before stitching extremely large images
+- optional `pyvips` stitch backend for large images
 - optional JPEG EXIF metadata writing via `--write-metadata`
 - optional JSON sidecar metadata output via `--write-sidecar`
 - batch task state tracking: pending, running, skipped, succeeded, failed
@@ -84,6 +85,7 @@ Metadata domain:
 - support richer batch input formats such as CSV or JSONL
 - improve log and event verbosity controls
 - move HTTP transport to `httpx`
+- add EXIF support for the `pyvips` stitch backend
 
 ### Low priority
 

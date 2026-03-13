@@ -5,7 +5,7 @@ from pathlib import Path
 
 from .download.downloader import download_artwork
 from .errors import DownloadError
-from .models import BatchRunResult, BatchSnapshot, BatchTask, DownloadResult, RetryConfig, TaskState
+from .models import BatchRunResult, BatchSnapshot, BatchTask, DownloadResult, RetryConfig, StitchBackend, TaskState
 from .reporters import Reporter
 
 
@@ -23,7 +23,8 @@ class BatchDownloadManager:
         skip_existing: bool,
         write_metadata: bool,
         write_sidecar: bool,
-        rerun_failures: int,
+        stitch_backend: StitchBackend = StitchBackend.AUTO,
+        rerun_failures: int = 0,
     ) -> None:
         self.urls = urls
         self.output_dir = output_dir
@@ -35,6 +36,7 @@ class BatchDownloadManager:
         self.skip_existing = skip_existing
         self.write_metadata = write_metadata
         self.write_sidecar = write_sidecar
+        self.stitch_backend = stitch_backend
         self.rerun_failures = rerun_failures
         self.tasks = [
             BatchTask(index=index, url=url, state=TaskState.PENDING)
@@ -72,6 +74,7 @@ class BatchDownloadManager:
                         skip_existing=self.skip_existing,
                         write_metadata=self.write_metadata,
                         write_sidecar=self.write_sidecar,
+                        stitch_backend=self.stitch_backend,
                         reporter=self.reporter,
                         index=task.index,
                         total=len(self.tasks),

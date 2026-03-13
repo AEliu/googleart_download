@@ -17,5 +17,10 @@ dependencies = [
 [project.scripts]
 googleart-download = "googleart_download.cli:main"
 
+[project.optional-dependencies]
+large-images = [
+    "pyvips>=3.1.1",
+]
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/googleart_download"]

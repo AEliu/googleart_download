@@ -7,10 +7,10 @@ from tempfile import TemporaryDirectory
 from PIL import Image
 
 from googleart_download.download.cache import ensure_cache_layout
-from googleart_download.download.image_writer import ensure_stitch_memory_budget
+from googleart_download.download.image_writer import choose_stitch_backend, ensure_stitch_memory_budget
 from googleart_download.download.tiles import download_tiles
 from googleart_download.errors import DownloadError
-from googleart_download.models import RetryConfig, TileJob, TileInfo, PyramidLevel
+from googleart_download.models import PyramidLevel, StitchBackend, TileInfo, TileJob
 from googleart_download.reporters import Reporter
 
 
@@ -74,6 +74,18 @@ class TileCacheTests(unittest.TestCase):
         with patch("googleart_download.download.image_writer._read_available_memory_bytes", return_value=1024):
             with self.assertRaises(DownloadError):
                 ensure_stitch_memory_budget(tile_info)
+
+    def test_auto_backend_prefers_pyvips_when_memory_is_not_safe(self) -> None:
+        tile_info = TileInfo(
+            tile_width=256,
+            tile_height=256,
+            levels=[PyramidLevel(z=0, num_tiles_x=10, num_tiles_y=10, empty_pels_x=0, empty_pels_y=0)],
+        )
+
+        from unittest.mock import patch
+
+        with patch("googleart_download.download.image_writer._read_available_memory_bytes", return_value=1024):
+            self.assertEqual(choose_stitch_backend(tile_info, StitchBackend.AUTO), StitchBackend.PYVIPS)
 
 
 if __name__ == "__main__":

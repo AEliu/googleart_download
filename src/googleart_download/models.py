@@ -107,6 +107,12 @@ class TaskState(str, Enum):
     FAILED = "failed"
 
 
+class StitchBackend(str, Enum):
+    AUTO = "auto"
+    PILLOW = "pillow"
+    PYVIPS = "pyvips"
+
+
 @dataclass(frozen=True)
 class BatchTask:
     index: int

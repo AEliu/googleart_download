@@ -94,6 +94,12 @@ Main issues:
 - high memory pressure during stitching
 - long final JPEG encoding and disk write time
 
+Current mitigation:
+
+- tile downloads are cached on disk and reused on rerun
+- Pillow stitching is guarded by a conservative memory check
+- an optional `pyvips` stitch backend can be used for large images
+
 ### Progress visibility
 
 Current progress is informative but not yet predictive enough for large jobs.
@@ -186,6 +192,24 @@ Final file output should become atomic:
 - rename only after the write succeeds
 
 This avoids corrupted or partial final outputs.
+
+### Stitch backend strategy
+
+The project now supports two stitch backends:
+
+- `pillow`
+  - simpler
+  - supports current EXIF writing path
+  - not suitable for extremely large images because it builds a full in-memory canvas
+- `pyvips`
+  - intended for very large images
+  - lower-memory execution path
+  - currently does not support the existing EXIF writing path
+
+The default strategy is `auto`:
+
+- use Pillow when the image is small enough for conservative in-memory stitching
+- use `pyvips` when the image is too large for safe Pillow stitching
 
 ### Better observability
 
