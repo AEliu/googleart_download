@@ -103,6 +103,16 @@ class MetadataOutputTests(unittest.TestCase):
         )
         self.assertEqual(path.name, "custom-name.metadata.json")
 
+    def test_default_metadata_output_path_uses_google_art_fallback_title(self) -> None:
+        path = resolve_default_metadata_output_path(
+            output_dir="downloads",
+            filename=None,
+            title="google-art",
+            download_size=DownloadSize.MAX,
+            max_dimension=None,
+        )
+        self.assertEqual(path.name, "google-art.metadata.json")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -17,6 +17,21 @@ class DummyReporter:
 
 
 class CliTests(unittest.TestCase):
+    def test_metadata_only_with_multiple_urls_rejects_filename(self) -> None:
+        stderr = io.StringIO()
+        with redirect_stderr(stderr), patch("googleart_download.cli.build_reporter", return_value=DummyReporter()):
+            code = cli.main(
+                [
+                    "https://artsandculture.google.com/asset/example/one",
+                    "https://artsandculture.google.com/asset/example/two",
+                    "--metadata-only",
+                    "--filename",
+                    "metadata.json",
+                ]
+            )
+        self.assertEqual(code, 1)
+        self.assertIn("--filename cannot be used with multiple URLs in --metadata-only mode", stderr.getvalue())
+
     def test_metadata_output_requires_metadata_only(self) -> None:
         stderr = io.StringIO()
         with redirect_stderr(stderr), patch("googleart_download.cli.build_reporter", return_value=DummyReporter()):
@@ -63,6 +78,35 @@ class CliTests(unittest.TestCase):
             payload = json.loads(output_path.read_text(encoding="utf-8"))
             self.assertEqual(payload, [{"title": "Artwork", "creator": "Artist"}])
             self.assertIn("Metadata saved", stderr.getvalue())
+
+    def test_single_url_metadata_only_falls_back_to_google_art_filename_when_title_missing(self) -> None:
+        fallback_payloads = [
+            {},
+            {"title": ""},
+            {"title": 123},
+        ]
+
+        for payload in fallback_payloads:
+            with self.subTest(payload=payload):
+                with TemporaryDirectory() as tmpdir:
+                    with patch("googleart_download.cli.inspect_artwork_metadata", return_value=payload):
+                        with patch("googleart_download.cli.build_reporter", return_value=DummyReporter()):
+                            stderr = io.StringIO()
+                            with redirect_stderr(stderr):
+                                code = cli.main(
+                                    [
+                                        "https://artsandculture.google.com/asset/example/id",
+                                        "--metadata-only",
+                                        "-o",
+                                        tmpdir,
+                                    ]
+                                )
+                    self.assertEqual(code, 0)
+                    output_path = Path(tmpdir) / "google-art.metadata.json"
+                    self.assertTrue(output_path.exists())
+                    saved_payload = json.loads(output_path.read_text(encoding="utf-8"))
+                    self.assertEqual(saved_payload, [payload])
+                    self.assertIn("Metadata saved", stderr.getvalue())
 
     def test_multi_url_metadata_only_outputs_json_array_to_stdout(self) -> None:
         stdout = io.StringIO()

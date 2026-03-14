@@ -119,6 +119,16 @@ uv run googleart-download \
   --metadata-only
 ```
 
+多个 URL 的元信息抓取如果要直接写文件：
+
+```bash
+uv run googleart-download \
+  "https://artsandculture.google.com/asset/..." \
+  "https://artsandculture.google.com/asset/..." \
+  --metadata-only \
+  --metadata-output metadata/batch.json
+```
+
 按用户友好的预设尺寸下载：
 
 ```bash
@@ -198,8 +208,10 @@ uv run googleart-download "https://artsandculture.google.com/asset/..." --log-fi
 - `--metadata-output` 可以把 `--metadata-only` 的结果写入 JSON 文件。
 - `--metadata-output` 必须和 `--metadata-only` 一起使用。
 - 单个 URL 使用 `--metadata-only` 且未指定 `--metadata-output` 时，会默认写出同名的 `.metadata.json` 文件。
+- 单个 URL 使用 `--metadata-only` 时，如果元信息里没有可用标题，会回退到 `google-art.metadata.json`。
 - 多个 URL 使用 `--metadata-only` 且未指定 `--metadata-output` 时，默认打印到标准输出。
 - 多个 URL 使用 `--metadata-only` 时，如果你希望落到文件而不是标准输出，请显式传 `--metadata-output path/to/file.json`。
+- 多个 URL 使用 `--metadata-only` 时，`--filename` 不生效，会直接报错。
 - `--log-file` 会把日志写入文件，`-v` 会开启更详细的日志输出。
 - `--tui` 会启用 richer terminal dashboard；如果你更喜欢纯 CLI 输出，可以不加它。
 - 下载时会把单张作品的 tile 临时缓存到输出目录下的 `.googleart-cache/`。如果下载过程中中断，下次运行会自动复用已经完成的 tile。

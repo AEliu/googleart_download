@@ -5,7 +5,16 @@ from pathlib import Path
 from ..logging_utils import get_logger
 from ..metadata.output import metadata_to_dict, write_metadata_sidecar
 from ..metadata.parsers import normalize_asset_url, parse_page_info, parse_tile_info
-from ..models import ArtworkContext, DownloadResult, DownloadSize, RetryConfig, SizeOption, StitchBackend, TileInfo
+from ..models import (
+    ArtworkContext,
+    DownloadResult,
+    DownloadSize,
+    JsonObject,
+    RetryConfig,
+    SizeOption,
+    StitchBackend,
+    TileInfo,
+)
 from ..reporters import Reporter
 from .cache import clear_cache_dir, ensure_cache_layout, resolve_artwork_cache_dir, tile_cache_path, write_cache_state
 from .http_client import HttpClient
@@ -23,12 +32,12 @@ def inspect_artwork_sizes(url: str, retry_config: RetryConfig) -> tuple[str, lis
     return page.title, list_size_options(tile_info)
 
 
-def inspect_artwork_metadata(url: str, retry_config: RetryConfig) -> dict[str, object]:
+def inspect_artwork_metadata(url: str, retry_config: RetryConfig) -> JsonObject:
     http_client = HttpClient(retry_config=retry_config)
     asset_url = normalize_asset_url(url)
     html = http_client.fetch_text(asset_url, description="artwork page")
     page = parse_page_info(html)
-    payload: dict[str, object] = metadata_to_dict(page.metadata) if page.metadata is not None else {}
+    payload: JsonObject = metadata_to_dict(page.metadata) if page.metadata is not None else {}
     payload["asset_url"] = asset_url
     payload.setdefault("title", page.title)
     return payload

@@ -4,6 +4,10 @@ from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 
+type JsonPrimitive = str | int | float | bool | None
+type JsonValue = JsonPrimitive | list["JsonValue"] | dict[str, "JsonValue"]
+type JsonObject = dict[str, JsonValue]
+
 
 @dataclass(frozen=True)
 class PageInfo:

@@ -14,7 +14,7 @@ from .download.downloader import inspect_artwork_metadata, inspect_artwork_sizes
 from .download.image_writer import resolve_output_path
 from .errors import DownloadError, build_error_guidance
 from .logging_utils import configure_logging
-from .models import BatchRunResult, DownloadSize, RetryConfig, SizeOption, StitchBackend
+from .models import BatchRunResult, DownloadSize, JsonObject, RetryConfig, SizeOption, StitchBackend
 from .reporters import build_reporter
 
 
@@ -132,9 +132,6 @@ def collect_urls(args: argparse.Namespace) -> list[str]:
     if not urls:
         raise DownloadError("provide at least one URL or use --url-file")
 
-    if args.filename and len(urls) > 1:
-        raise DownloadError("--filename can only be used with a single URL")
-
     if args.retries < 1:
         raise DownloadError("--retries must be at least 1")
 
@@ -151,6 +148,12 @@ def collect_urls(args: argparse.Namespace) -> list[str]:
 
 
 def validate_cli_args(args: argparse.Namespace, urls: list[str]) -> None:
+    if args.metadata_only and args.filename and len(urls) > 1:
+        raise DownloadError("--filename cannot be used with multiple URLs in --metadata-only mode")
+
+    if args.filename and len(urls) > 1:
+        raise DownloadError("--filename can only be used with a single URL")
+
     if args.metadata_output and not args.metadata_only:
         raise DownloadError("--metadata-output requires --metadata-only")
 
@@ -188,7 +191,7 @@ def write_metadata_output_file(output_path: Path, payload: str) -> None:
         raise DownloadError(f"failed to write metadata output file: {output_path}: {exc}") from exc
 
 
-def render_metadata_output(results: list[dict[str, object]], output_path: str | None) -> None:
+def emit_metadata_output(results: list[JsonObject], output_path: str | None) -> None:
     payload = json.dumps(results, ensure_ascii=False, indent=2) + "\n"
     if output_path:
         output_file = Path(output_path)
@@ -238,7 +241,7 @@ def run_metadata_only(args: argparse.Namespace, urls: list[str], retry_config: R
             "Use --metadata-output to save to a file."
         )
 
-    render_metadata_output(results, metadata_output)
+    emit_metadata_output(results, metadata_output)
     return 0
 
 
@@ -274,18 +277,18 @@ def render_summary(run_result: BatchRunResult) -> None:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
-    configure_logging(verbose=args.verbose, log_file=args.log_file)
-
-    reporter = build_reporter(args.tui)
-    retry_config = RetryConfig(
-        attempts=args.retries,
-        backoff_base_seconds=args.retry_backoff,
-    )
+    reporter = None
     run_result: BatchRunResult | None = None
 
     try:
         urls = collect_urls(args)
         validate_cli_args(args, urls)
+        configure_logging(verbose=args.verbose, log_file=args.log_file)
+        reporter = build_reporter(args.tui)
+        retry_config = RetryConfig(
+            attempts=args.retries,
+            backoff_base_seconds=args.retry_backoff,
+        )
         if args.list_sizes:
             title, options = inspect_artwork_sizes(urls[0], retry_config)
             render_size_options(title, options)
@@ -316,7 +319,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             console.print(f"[yellow]Hint:[/yellow] {line}")
         return 1
     finally:
-        reporter.close()
+        if reporter is not None:
+            reporter.close()
 
     assert run_result is not None
     render_summary(run_result)
