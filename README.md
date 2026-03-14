@@ -230,6 +230,10 @@ uv run googleart-download "https://artsandculture.google.com/asset/..." --log-fi
 - `--stitch-backend auto` 会优先使用 Pillow；当图像过大、不适合安全内存拼接时，会切到 `bigtiff` 流式拼图。
 - `bigtiff` 路径会先把 tile 流式写成 BigTIFF 成品；默认不再自动帮你转成 JPEG，这样比直接在内存里拼超大图更稳。
 - 当 `auto` 或 `bigtiff` 选中了流式大图路径时，默认输出文件扩展名会调整为 `.tif`。
+- 正常尺寸作品默认仍然输出 `.jpg`；只有超大图自动切到流式大图路径时，才会改成 `.tif`。
+- 这是一条有意为之的产品策略：先保证超大图能够稳定拼完，再把是否转 JPEG 交给用户自己决定。
+- 超大图的 JPEG 转换不属于默认下载流程的一部分。
+- 如果目录里遗留了旧版本失败下载留下的 `.part.jpg` 临时文件，切到 `bigtiff` 路径时程序会尽量清理这些不再相关的残留文件。
 - 当前 `bigtiff` 和 `pyvips` 路径都还不支持写 JPEG EXIF。超大图场景下如果需要元数据，优先使用 `--write-sidecar`。
 - 有些页面可能会被地区、权限或站点改版影响，如果 Google 改了瓦片签名规则，代码也需要跟着调整。
 - 目前的 TUI 是基于 `rich` 的 live dashboard，不是复杂的全屏交互应用。这是有意为之，因为当前任务流是单向下载任务，`rich` 方案更稳、更容易维护。

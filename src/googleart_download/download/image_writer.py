@@ -44,6 +44,19 @@ def resolve_backend_output_path(output_path: Path, backend: StitchBackend) -> Pa
     return output_path.with_suffix(".tif")
 
 
+def cleanup_stale_partial_outputs(original_output_path: Path, final_output_path: Path, backend: StitchBackend) -> list[Path]:
+    stale_paths: list[Path] = []
+    if backend is StitchBackend.BIGTIFF and original_output_path != final_output_path:
+        stale_paths.append(build_temp_output_path(original_output_path))
+
+    removed: list[Path] = []
+    for stale_path in stale_paths:
+        if stale_path.exists():
+            stale_path.unlink()
+            removed.append(stale_path)
+    return removed
+
+
 def resolve_output_path(
     output_dir: Path,
     filename: str | None,

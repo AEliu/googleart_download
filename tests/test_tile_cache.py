@@ -12,6 +12,7 @@ from googleart_download.download.cache import ensure_cache_layout, resolve_artwo
 from googleart_download.download.image_writer import (
     build_bigtiff_temp_path,
     build_temp_output_path,
+    cleanup_stale_partial_outputs,
     choose_stitch_backend,
     ensure_stitch_memory_budget,
     resolve_backend_output_path,
@@ -187,6 +188,33 @@ class TileCacheTests(unittest.TestCase):
     def test_resolve_backend_output_path_keeps_existing_tiff_extension(self) -> None:
         path = resolve_backend_output_path(Path("/tmp/The Starry Night.tiff"), StitchBackend.BIGTIFF)
         self.assertEqual(path.name, "The Starry Night.tiff")
+
+    def test_resolve_backend_output_path_keeps_normal_jpg_for_pillow(self) -> None:
+        path = resolve_backend_output_path(Path("/tmp/The Great Wave.jpg"), StitchBackend.PILLOW)
+        self.assertEqual(path.name, "The Great Wave.jpg")
+
+    def test_cleanup_stale_partial_outputs_removes_old_jpeg_temp_for_bigtiff(self) -> None:
+        with TemporaryDirectory() as tmpdir:
+            original = Path(tmpdir) / "The Starry Night.jpg"
+            final = Path(tmpdir) / "The Starry Night.tif"
+            stale = build_temp_output_path(original)
+            stale.write_bytes(b"partial")
+
+            removed = cleanup_stale_partial_outputs(original, final, StitchBackend.BIGTIFF)
+
+            self.assertEqual(removed, [stale])
+            self.assertFalse(stale.exists())
+
+    def test_cleanup_stale_partial_outputs_keeps_normal_partial_for_non_bigtiff(self) -> None:
+        with TemporaryDirectory() as tmpdir:
+            output = Path(tmpdir) / "The Great Wave.jpg"
+            stale = build_temp_output_path(output)
+            stale.write_bytes(b"partial")
+
+            removed = cleanup_stale_partial_outputs(output, output, StitchBackend.PILLOW)
+
+            self.assertEqual(removed, [])
+            self.assertTrue(stale.exists())
 
     def test_resolve_artwork_cache_dir_uses_stable_asset_url(self) -> None:
         with TemporaryDirectory() as tmpdir:

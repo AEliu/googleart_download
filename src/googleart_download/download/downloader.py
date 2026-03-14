@@ -18,7 +18,7 @@ from ..models import (
 from ..reporters import Reporter
 from .cache import clear_cache_dir, ensure_cache_layout, resolve_artwork_cache_dir, tile_cache_path, write_cache_state
 from .http_client import HttpClient
-from .image_writer import choose_stitch_backend, resolve_backend_output_path, resolve_output_path, stitch_tiles
+from .image_writer import cleanup_stale_partial_outputs, choose_stitch_backend, resolve_backend_output_path, resolve_output_path, stitch_tiles
 from .size_selection import list_size_options, select_download_level
 from .tiles import build_jobs, download_tiles
 
@@ -66,7 +66,7 @@ def download_artwork(
     reporter.log(f"Fetching artwork page: {asset_url}")
     html = http_client.fetch_text(asset_url, description="artwork page")
     page = parse_page_info(html)
-    output_path = resolve_output_path(
+    original_output_path = resolve_output_path(
         output_dir,
         filename,
         page.title,
@@ -78,7 +78,8 @@ def download_artwork(
     selected_level = select_download_level(tile_info, size=download_size, max_dimension=max_dimension)
     selected_tile_info = TileInfo(tile_width=tile_info.tile_width, tile_height=tile_info.tile_height, levels=[selected_level])
     selected_backend = choose_stitch_backend(selected_tile_info, stitch_backend)
-    output_path = resolve_backend_output_path(output_path, selected_backend)
+    output_path = resolve_backend_output_path(original_output_path, selected_backend)
+    removed_partials = cleanup_stale_partial_outputs(original_output_path, output_path, selected_backend)
 
     if skip_existing and output_path.exists():
         sidecar_path = output_path.with_suffix(output_path.suffix + ".json") if write_sidecar else None
@@ -124,8 +125,11 @@ def download_artwork(
         f"{page.title} | {tile_info.image_width_for(selected_level)}x{tile_info.image_height_for(selected_level)} | "
         f"{len(jobs)} tiles | level {selected_level.z}"
     )
+    reporter.log(f"Output format: {output_path.suffix.lower().lstrip('.').upper()}")
     if selected_backend is StitchBackend.BIGTIFF:
         reporter.log(f"Large artwork output adjusted to TIFF for streaming stitch safety: {output_path}")
+    for stale_partial in removed_partials:
+        reporter.log(f"Removed stale partial output from older JPEG attempt: {stale_partial}")
     write_cache_state(
         cache_dir,
         page=page,
