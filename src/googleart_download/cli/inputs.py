@@ -81,6 +81,21 @@ def validate_cli_args(args: argparse.Namespace, urls: list[str]) -> None:
     if args.metadata_only and args.list_sizes:
         raise DownloadError("--metadata-only cannot be used together with --list-sizes")
 
+    if args.tile_only and args.metadata_only:
+        raise DownloadError("--tile-only cannot be used together with --metadata-only")
+
+    if args.tile_only and args.list_sizes:
+        raise DownloadError("--tile-only cannot be used together with --list-sizes")
+
+    if args.tile_only and args.write_metadata:
+        raise DownloadError("--tile-only cannot be used together with --write-metadata")
+
+    if args.tile_only and args.write_sidecar:
+        raise DownloadError("--tile-only cannot be used together with --write-sidecar")
+
+    if args.tile_only and args.stitch_backend != "auto":
+        raise DownloadError("--tile-only cannot be used together with an explicit --stitch-backend")
+
     if args.list_sizes and len(urls) != 1:
         raise DownloadError("--list-sizes requires exactly one artwork URL")
 

@@ -97,7 +97,7 @@ def render_summary(run_result: BatchRunResult) -> None:
 
     for result in run_result.succeeded:
         status = "skipped" if result.skipped else "ok"
-        image_format = result.output_path.suffix.lower().lstrip(".").upper() or "-"
+        image_format = "TILES" if result.tile_only else (result.output_path.suffix.lower().lstrip(".").upper() or "-")
         backend = result.backend_used.value if result.backend_used is not None else "-"
         size = "-" if result.size is None else f"{result.size[0]}x{result.size[1]}"
         tiles = "-" if result.tile_count is None else str(result.tile_count)

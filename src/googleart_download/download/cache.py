@@ -29,6 +29,26 @@ def _read_cache_state(cache_dir: Path) -> dict[str, object] | None:
     return payload if isinstance(payload, dict) else None
 
 
+def cache_matches_asset(cache_dir: Path, asset_url: str) -> bool:
+    state = _read_cache_state(cache_dir)
+    return state is not None and state.get("asset_url") == asset_url
+
+
+def cache_has_complete_tiles(cache_dir: Path, asset_url: str, jobs: list[TileJob]) -> bool:
+    state = _read_cache_state(cache_dir)
+    if state is None or state.get("asset_url") != asset_url:
+        return False
+    if state.get("completed_tiles") != len(jobs):
+        return False
+    if state.get("total_tiles") != len(jobs):
+        return False
+    if state.get("stage") != "downloaded":
+        return False
+
+    tiles_dir = cache_dir / "tiles"
+    return all(tile_cache_path(tiles_dir, job).exists() for job in jobs)
+
+
 def _find_legacy_cache_dir(output_dir: Path, output_path: Path) -> Path | None:
     cache_root = output_dir / ".googleart-cache"
     if not cache_root.exists():
@@ -81,6 +101,7 @@ def tile_cache_path(tiles_dir: Path, job: TileJob) -> Path:
 def write_cache_state(
     cache_dir: Path,
     *,
+    asset_url: str,
     page: PageInfo,
     tile_info: TileInfo,
     output_path: Path,
@@ -90,6 +111,7 @@ def write_cache_state(
 ) -> None:
     state = {
         "schema_version": CACHE_SCHEMA_VERSION,
+        "asset_url": asset_url,
         "title": page.title,
         "base_url": page.base_url,
         "tile_info_url": page.tile_info_url,

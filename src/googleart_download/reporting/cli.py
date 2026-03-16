@@ -104,7 +104,10 @@ class RichCliReporter(Reporter):
                 self.progress.update(self.tile_task_id, completed=1, total=1)
             else:
                 self.progress.update(self.tile_task_id, completed=self.current_tile_total)
-        self.log(f"Saved: {result.output_path}")
+        if result.tile_only:
+            self.log(f"Tiles saved: {result.output_path}")
+        else:
+            self.log(f"Saved: {result.output_path}")
         if result.sidecar_path is not None:
             self.log(f"Sidecar: {result.sidecar_path}")
 

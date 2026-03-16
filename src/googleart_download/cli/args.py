@@ -166,6 +166,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="write artwork metadata to a JSON sidecar next to the image",
     )
     parser.add_argument(
+        "--tile-only",
+        action="store_true",
+        help="download artwork tiles into a local .tiles directory without stitching a final image",
+    )
+    parser.add_argument(
         "--stitch-backend",
         choices=[backend.value for backend in StitchBackend],
         default=StitchBackend.AUTO.value,

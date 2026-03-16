@@ -101,6 +101,9 @@ Repo quality and automation:
 
 ### High priority
 
+- add explicit tile-retention controls:
+  - `--tile-only` for users who want downloaded tiles without local stitching
+  - later evaluate a separate `--keep-tiles` mode so successful stitched runs can preserve tile caches on purpose
 - enrich `--list-sizes` output further with optional rough output-size estimates
 - refine size preset thresholds if real-world usage suggests better defaults
 - expand test coverage for:

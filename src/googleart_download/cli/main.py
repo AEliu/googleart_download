@@ -181,6 +181,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             ),
             write_metadata=args.write_metadata,
             write_sidecar=args.write_sidecar,
+            tile_only=args.tile_only,
             stitch_backend=StitchBackend(args.stitch_backend),
             rerun_failures=args.rerun_failures,
             resume_batch=args.resume_batch,

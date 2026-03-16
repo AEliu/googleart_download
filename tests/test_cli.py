@@ -166,6 +166,33 @@ class CliTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("--metadata-only cannot be used together with --list-sizes", stderr.getvalue())
 
+    def test_tile_only_conflicts_with_write_metadata(self) -> None:
+        stderr = io.StringIO()
+        with redirect_stderr(stderr), patch("googleart_download.cli.build_reporter", return_value=DummyReporter()):
+            code = cli.main(
+                [
+                    "https://artsandculture.google.com/asset/example/id",
+                    "--tile-only",
+                    "--write-metadata",
+                ]
+            )
+        self.assertEqual(code, 1)
+        self.assertIn("--tile-only cannot be used together with --write-metadata", stderr.getvalue())
+
+    def test_tile_only_conflicts_with_explicit_stitch_backend(self) -> None:
+        stderr = io.StringIO()
+        with redirect_stderr(stderr), patch("googleart_download.cli.build_reporter", return_value=DummyReporter()):
+            code = cli.main(
+                [
+                    "https://artsandculture.google.com/asset/example/id",
+                    "--tile-only",
+                    "--stitch-backend",
+                    "pillow",
+                ]
+            )
+        self.assertEqual(code, 1)
+        self.assertIn("--tile-only cannot be used together with an explicit --stitch-backend", stderr.getvalue())
+
     def test_list_sizes_passes_explicit_proxy_to_inspection(self) -> None:
         stdout = io.StringIO()
         with patch("googleart_download.cli.build_reporter", return_value=DummyReporter()):

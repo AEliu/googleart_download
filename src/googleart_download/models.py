@@ -99,6 +99,7 @@ class DownloadResult:
     size: tuple[int, int] | None
     tile_count: int | None
     skipped: bool = False
+    tile_only: bool = False
     sidecar_path: Path | None = None
     backend_used: "StitchBackend | None" = None
 
