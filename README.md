@@ -177,7 +177,15 @@ uv run googleart-download --url-file urls.txt
 uv run googleart-download --url-file urls.txt --fail-fast
 ```
 
-默认会跳过已经存在的目标文件。如果你需要强制重新下载：
+默认会跳过已经存在的目标文件。如果你需要显式控制冲突策略：
+
+```bash
+uv run googleart-download --url-file urls.txt --output-conflict skip
+uv run googleart-download --url-file urls.txt --output-conflict overwrite
+uv run googleart-download --url-file urls.txt --output-conflict rename
+```
+
+如果你需要兼容旧写法并强制重新下载：
 
 ```bash
 uv run googleart-download --url-file urls.txt --no-skip-existing
@@ -228,6 +236,11 @@ uv run googleart-download "https://artsandculture.google.com/asset/..." --log-fi
 - `--workers` 控制单张作品内部的 tile 下载并发数。默认值是自动计算的，通常不需要手动改；网络好、机器资源足够时可以适当调高，但过高可能触发限速、重试增多，甚至整体更慢。
 - 如果大图下载过程中出现单个 tile 的 SSL / EOF / timeout 之类网络错误，通常可以直接重跑；已下载 tile 会从缓存复用。此时优先尝试提高 `--retries`，必要时再适当降低 `--workers`。
 - `--filename` 只适用于单个 URL 下载；批量下载时不能和多个 URL 一起使用。
+- `--output-conflict` 控制目标文件已存在时的行为：
+  - `skip`：跳过，默认行为
+  - `overwrite`：覆盖已有输出
+  - `rename`：自动改成 `.2`、`.3` 这类不冲突文件名
+- `--no-skip-existing` 是兼容旧写法，等价于 `--output-conflict overwrite`；不要和 `--output-conflict` 同时使用。
 - `--list-sizes` 只适用于单个 URL；它会读取页面和瓦片元数据后直接退出，不会开始图片下载。
 - `--metadata-only` 只抓作品页元信息并输出 JSON，不会下载 tile 或生成图片文件。
 - `--metadata-only` 不能和 `--list-sizes` 同时使用。

@@ -216,6 +216,20 @@ class CliTests(unittest.TestCase):
             self.assertEqual(payload, [{"title": "Artwork"}])
             self.assertIn("Metadata saved", stderr.getvalue())
 
+    def test_no_skip_existing_conflicts_with_output_conflict(self) -> None:
+        stderr = io.StringIO()
+        with redirect_stderr(stderr), patch("googleart_download.cli.build_reporter", return_value=DummyReporter()):
+            code = cli.main(
+                [
+                    "https://artsandculture.google.com/asset/example/id",
+                    "--no-skip-existing",
+                    "--output-conflict",
+                    "rename",
+                ]
+            )
+        self.assertEqual(code, 1)
+        self.assertIn("--no-skip-existing cannot be used together with --output-conflict", stderr.getvalue())
+
     def test_main_logs_when_batch_inputs_are_deduped(self) -> None:
         reporter = MagicMock()
         fake_manager = MagicMock()

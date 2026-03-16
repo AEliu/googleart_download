@@ -10,6 +10,7 @@ from ..models import (
     DownloadResult,
     DownloadSize,
     JsonObject,
+    OutputConflictPolicy,
     RetryConfig,
     SizeOption,
     StitchBackend,
@@ -18,7 +19,14 @@ from ..models import (
 from ..reporters import Reporter
 from .cache import clear_cache_dir, ensure_cache_layout, resolve_artwork_cache_dir, tile_cache_path, write_cache_state
 from .http_client import HttpClient
-from .image_writer import cleanup_stale_partial_outputs, choose_stitch_backend, resolve_backend_output_path, resolve_output_path, stitch_tiles
+from .image_writer import (
+    cleanup_stale_partial_outputs,
+    choose_stitch_backend,
+    resolve_backend_output_path,
+    resolve_non_conflicting_output_path,
+    resolve_output_path,
+    stitch_tiles,
+)
 from .size_selection import list_size_options, select_download_level
 from .tiles import build_jobs, download_tiles
 
@@ -52,7 +60,7 @@ def download_artwork(
     retry_config: RetryConfig,
     download_size: DownloadSize,
     max_dimension: int | None,
-    skip_existing: bool,
+    output_conflict_policy: OutputConflictPolicy,
     write_metadata: bool,
     write_sidecar: bool,
     stitch_backend: StitchBackend,
@@ -84,9 +92,13 @@ def download_artwork(
         selected_tile_info = TileInfo(tile_width=tile_info.tile_width, tile_height=tile_info.tile_height, levels=[selected_level])
         selected_backend = choose_stitch_backend(selected_tile_info, stitch_backend)
         output_path = resolve_backend_output_path(original_output_path, selected_backend)
+        if output_conflict_policy is OutputConflictPolicy.RENAME and output_path.exists():
+            renamed_output_path = resolve_non_conflicting_output_path(output_path)
+            reporter.log(f"Output already exists, renaming to: {renamed_output_path}")
+            output_path = renamed_output_path
         removed_partials = cleanup_stale_partial_outputs(original_output_path, output_path, selected_backend)
 
-        if skip_existing and output_path.exists():
+        if output_conflict_policy is OutputConflictPolicy.SKIP and output_path.exists():
             sidecar_path = output_path.with_suffix(output_path.suffix + ".json") if write_sidecar else None
             return DownloadResult(
                 url=canonical_asset_url,
@@ -97,6 +109,8 @@ def download_artwork(
                 skipped=True,
                 sidecar_path=sidecar_path if sidecar_path and sidecar_path.exists() else None,
             )
+        if output_conflict_policy is OutputConflictPolicy.OVERWRITE and output_path.exists():
+            reporter.log(f"Overwriting existing output: {output_path}")
 
         cache_dir = resolve_artwork_cache_dir(output_dir, canonical_asset_url, output_path)
         tiles_dir = ensure_cache_layout(cache_dir)

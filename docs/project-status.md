@@ -22,7 +22,8 @@ The project currently supports:
 - official Google short links via `g.co/arts/...`
 - direct artwork asset-id input such as `3QFHLJgXCmQm2Q`
 - batch input deduplication across equivalent artwork forms such as canonical URLs, `?ms=...` variants, `g.co/arts/...`, and bare asset ids
-- skip-existing behavior by default, with `--no-skip-existing` override
+- explicit output conflict handling via `--output-conflict skip|overwrite|rename`
+- compatibility override via `--no-skip-existing`
 - single-artwork tile cache reuse across reruns
 - conservative memory guard before stitching extremely large images
 - optional `bigtiff` streaming stitch backend for very large images
@@ -77,7 +78,6 @@ Metadata domain:
 ### High priority
 
 - add targeted rerun support for previously failed tasks
-- add output conflict policies beyond skip and force-redownload
 - improve large-job observability:
   - ETA
   - tile rate

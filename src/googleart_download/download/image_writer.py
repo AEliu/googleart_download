@@ -71,6 +71,21 @@ def resolve_output_path(
     return output_dir / f"{sanitize_filename(title)}{suffix}.jpg"
 
 
+def resolve_non_conflicting_output_path(output_path: Path) -> Path:
+    if not output_path.exists():
+        return output_path
+
+    parent = output_path.parent
+    suffix = output_path.suffix
+    stem = output_path.stem
+    index = 2
+    while True:
+        candidate = parent / f"{stem}.{index}{suffix}"
+        if not candidate.exists():
+            return candidate
+        index += 1
+
+
 def _read_available_memory_bytes() -> int | None:
     meminfo = Path("/proc/meminfo")
     if meminfo.exists():

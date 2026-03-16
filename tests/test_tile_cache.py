@@ -16,6 +16,7 @@ from googleart_download.download.image_writer import (
     choose_stitch_backend,
     ensure_stitch_memory_budget,
     resolve_backend_output_path,
+    resolve_non_conflicting_output_path,
     resolve_output_path,
 )
 from googleart_download.download.size_selection import list_size_options, select_download_level
@@ -208,6 +209,22 @@ class TileCacheTests(unittest.TestCase):
     def test_resolve_backend_output_path_keeps_normal_jpg_for_pillow(self) -> None:
         path = resolve_backend_output_path(Path("/tmp/The Great Wave.jpg"), StitchBackend.PILLOW)
         self.assertEqual(path.name, "The Great Wave.jpg")
+
+    def test_resolve_non_conflicting_output_path_keeps_unused_path(self) -> None:
+        path = resolve_non_conflicting_output_path(Path("/tmp/The Great Wave.jpg"))
+        self.assertEqual(path.name, "The Great Wave.jpg")
+
+    def test_resolve_non_conflicting_output_path_adds_numeric_suffix(self) -> None:
+        with TemporaryDirectory() as tmpdir:
+            original = Path(tmpdir) / "The Great Wave.jpg"
+            original.write_bytes(b"existing")
+
+            second = resolve_non_conflicting_output_path(original)
+            self.assertEqual(second.name, "The Great Wave.2.jpg")
+            second.write_bytes(b"existing")
+
+            third = resolve_non_conflicting_output_path(original)
+            self.assertEqual(third.name, "The Great Wave.3.jpg")
 
     def test_cleanup_stale_partial_outputs_removes_old_jpeg_temp_for_bigtiff(self) -> None:
         with TemporaryDirectory() as tmpdir:

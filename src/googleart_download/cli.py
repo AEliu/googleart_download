@@ -16,7 +16,7 @@ from .download.image_writer import resolve_output_path
 from .errors import DownloadError, build_error_guidance
 from .logging_utils import configure_logging
 from .metadata.parsers import extract_asset_id, normalize_asset_url
-from .models import BatchRunResult, DownloadSize, JsonObject, RetryConfig, SizeOption, StitchBackend
+from .models import BatchRunResult, DownloadSize, JsonObject, OutputConflictPolicy, RetryConfig, SizeOption, StitchBackend
 from .reporters import build_reporter
 
 
@@ -88,7 +88,13 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--no-skip-existing",
         action="store_true",
-        help="download again even if the target file already exists",
+        help="compatibility alias for --output-conflict overwrite",
+    )
+    parser.add_argument(
+        "--output-conflict",
+        choices=[policy.value for policy in OutputConflictPolicy],
+        default=OutputConflictPolicy.SKIP.value,
+        help="what to do when the target output already exists: skip, overwrite, or rename (default: skip)",
     )
     size_group = parser.add_mutually_exclusive_group()
     size_group.add_argument(
@@ -185,6 +191,9 @@ def validate_cli_args(args: argparse.Namespace, urls: list[str]) -> None:
 
     if args.filename and len(urls) > 1:
         raise DownloadError("--filename can only be used with a single URL")
+
+    if args.no_skip_existing and args.output_conflict != OutputConflictPolicy.SKIP.value:
+        raise DownloadError("--no-skip-existing cannot be used together with --output-conflict")
 
     if args.metadata_output and not args.metadata_only:
         raise DownloadError("--metadata-output requires --metadata-only")
@@ -390,7 +399,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             fail_fast=args.fail_fast,
             download_size=DownloadSize(args.size),
             max_dimension=args.max_dimension,
-            skip_existing=not args.no_skip_existing,
+            output_conflict_policy=(
+                OutputConflictPolicy.OVERWRITE if args.no_skip_existing else OutputConflictPolicy(args.output_conflict)
+            ),
             write_metadata=args.write_metadata,
             write_sidecar=args.write_sidecar,
             stitch_backend=StitchBackend(args.stitch_backend),

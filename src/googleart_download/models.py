@@ -144,6 +144,12 @@ class DownloadSize(str, Enum):
     MAX = "max"
 
 
+class OutputConflictPolicy(str, Enum):
+    SKIP = "skip"
+    OVERWRITE = "overwrite"
+    RENAME = "rename"
+
+
 @dataclass(frozen=True)
 class SizeOption:
     label: str

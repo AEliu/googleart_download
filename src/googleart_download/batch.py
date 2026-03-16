@@ -12,6 +12,7 @@ from .models import (
     BatchTask,
     DownloadResult,
     DownloadSize,
+    OutputConflictPolicy,
     RetryConfig,
     StitchBackend,
     TaskState,
@@ -32,7 +33,7 @@ class BatchDownloadManager:
         fail_fast: bool,
         download_size: DownloadSize,
         max_dimension: int | None,
-        skip_existing: bool,
+        output_conflict_policy: OutputConflictPolicy,
         write_metadata: bool,
         write_sidecar: bool,
         stitch_backend: StitchBackend = StitchBackend.AUTO,
@@ -49,7 +50,7 @@ class BatchDownloadManager:
         self.fail_fast = fail_fast
         self.download_size = download_size
         self.max_dimension = max_dimension
-        self.skip_existing = skip_existing
+        self.output_conflict_policy = output_conflict_policy
         self.write_metadata = write_metadata
         self.write_sidecar = write_sidecar
         self.stitch_backend = stitch_backend
@@ -101,7 +102,7 @@ class BatchDownloadManager:
                         retry_config=self.retry_config,
                         download_size=self.download_size,
                         max_dimension=self.max_dimension,
-                        skip_existing=self.skip_existing,
+                        output_conflict_policy=self.output_conflict_policy,
                         write_metadata=self.write_metadata,
                         write_sidecar=self.write_sidecar,
                         stitch_backend=self.stitch_backend,

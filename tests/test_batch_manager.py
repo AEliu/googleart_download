@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 from googleart_download.batch import BatchDownloadManager
 from googleart_download.errors import DownloadError
-from googleart_download.models import DownloadResult, DownloadSize, RetryConfig, TaskState
+from googleart_download.models import DownloadResult, DownloadSize, OutputConflictPolicy, RetryConfig, TaskState
 from googleart_download.reporters import Reporter
 
 
@@ -42,7 +42,7 @@ class BatchManagerTests(unittest.TestCase):
                 fail_fast=False,
                 download_size=DownloadSize.MAX,
                 max_dimension=None,
-                skip_existing=False,
+                output_conflict_policy=OutputConflictPolicy.OVERWRITE,
                 write_metadata=False,
                 write_sidecar=False,
             )
@@ -86,7 +86,7 @@ class BatchManagerTests(unittest.TestCase):
                 fail_fast=False,
                 download_size=DownloadSize.MAX,
                 max_dimension=None,
-                skip_existing=False,
+                output_conflict_policy=OutputConflictPolicy.OVERWRITE,
                 write_metadata=False,
                 write_sidecar=False,
                 rerun_failures=1,
@@ -168,7 +168,7 @@ class BatchManagerTests(unittest.TestCase):
                 fail_fast=False,
                 download_size=DownloadSize.MAX,
                 max_dimension=None,
-                skip_existing=False,
+                output_conflict_policy=OutputConflictPolicy.OVERWRITE,
                 write_metadata=False,
                 write_sidecar=False,
                 resume_batch=True,
@@ -197,7 +197,7 @@ class BatchManagerTests(unittest.TestCase):
                     fail_fast=False,
                     download_size=DownloadSize.MAX,
                     max_dimension=None,
-                    skip_existing=False,
+                    output_conflict_policy=OutputConflictPolicy.OVERWRITE,
                     write_metadata=False,
                     write_sidecar=False,
                     resume_batch=True,
@@ -224,7 +224,7 @@ class BatchManagerTests(unittest.TestCase):
                 fail_fast=True,
                 download_size=DownloadSize.MAX,
                 max_dimension=None,
-                skip_existing=False,
+                output_conflict_policy=OutputConflictPolicy.OVERWRITE,
                 write_metadata=False,
                 write_sidecar=False,
                 rerun_failures=2,
