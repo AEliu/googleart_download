@@ -122,6 +122,14 @@ uv run googleart-download "3QFHLJgXCmQm2Q" --jpeg-quality 85
 uv run googleart-download "3QFHLJgXCmQm2Q" --jpeg-preset balanced
 ```
 
+Use an explicit proxy when Google Arts is blocked or unstable from your network:
+
+```bash
+uv run googleart-download "3QFHLJgXCmQm2Q" --proxy http://127.0.0.1:7890
+```
+
+If you prefer environment variables, standard proxy variables such as `HTTPS_PROXY` and `ALL_PROXY` also work. An explicit `--proxy` takes precedence over environment proxy settings.
+
 ## Output Format Behavior
 
 Normal-sized artworks default to JPEG output.

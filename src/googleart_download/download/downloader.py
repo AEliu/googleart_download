@@ -31,8 +31,10 @@ from .size_selection import list_size_options, select_download_level
 from .tiles import build_jobs, download_tiles
 
 
-def inspect_artwork_sizes(url: str, retry_config: RetryConfig) -> tuple[str, list[SizeOption]]:
-    with HttpClient(retry_config=retry_config) as http_client:
+def inspect_artwork_sizes(
+    url: str, retry_config: RetryConfig, *, proxy_url: str | None = None
+) -> tuple[str, list[SizeOption]]:
+    with HttpClient(retry_config=retry_config, proxy_url=proxy_url) as http_client:
         asset_url = normalize_asset_url(url)
         html, fetched_url = http_client.fetch_text_with_url(asset_url, description="artwork page")
         page = parse_page_info(html, fetched_url=fetched_url)
@@ -40,8 +42,8 @@ def inspect_artwork_sizes(url: str, retry_config: RetryConfig) -> tuple[str, lis
         return page.title, list_size_options(tile_info)
 
 
-def inspect_artwork_metadata(url: str, retry_config: RetryConfig) -> JsonObject:
-    with HttpClient(retry_config=retry_config) as http_client:
+def inspect_artwork_metadata(url: str, retry_config: RetryConfig, *, proxy_url: str | None = None) -> JsonObject:
+    with HttpClient(retry_config=retry_config, proxy_url=proxy_url) as http_client:
         asset_url = normalize_asset_url(url)
         html, fetched_url = http_client.fetch_text_with_url(asset_url, description="artwork page")
         page = parse_page_info(html, fetched_url=fetched_url)
@@ -70,9 +72,14 @@ def download_artwork(
     reporter: Reporter,
     index: int,
     total: int,
+    proxy_url: str | None = None,
 ) -> DownloadResult:
     logger = get_logger()
-    with HttpClient(retry_config=retry_config, on_retry=reporter.retry_recorded) as http_client:
+    with HttpClient(
+        retry_config=retry_config,
+        proxy_url=proxy_url,
+        on_retry=reporter.retry_recorded,
+    ) as http_client:
         asset_url = normalize_asset_url(url)
         logger.info("Fetching artwork page: %s", asset_url)
         reporter.phase_changed("fetching")

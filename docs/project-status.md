@@ -68,6 +68,7 @@ Repo quality and automation:
 - `tests/fixtures/smoke_assets.json` tracks a small set of real-world smoke artwork inputs for manual workflow use:
   - built-in named cases cover bare asset ids, query-string URLs, and `g.co` short links
   - the workflow still supports a manual custom artwork input override when needed
+- explicit CLI proxy support is available through `--proxy`, while standard proxy environment variables remain supported by default
 - `scripts/generate_readme_assets.py` is treated as a generated-doc asset source rather than a hand-maintained file
 
 ## Recent completed work

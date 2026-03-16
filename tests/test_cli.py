@@ -166,6 +166,30 @@ class CliTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("--metadata-only cannot be used together with --list-sizes", stderr.getvalue())
 
+    def test_list_sizes_passes_explicit_proxy_to_inspection(self) -> None:
+        stdout = io.StringIO()
+        with patch("googleart_download.cli.build_reporter", return_value=DummyReporter()):
+            with patch(
+                "googleart_download.cli.inspect_artwork_sizes",
+                return_value=("Artwork", []),
+            ) as inspect_mock:
+                with redirect_stdout(stdout):
+                    code = cli.main(
+                        [
+                            "3QFHLJgXCmQm2Q",
+                            "--list-sizes",
+                            "--proxy",
+                            "http://127.0.0.1:7890",
+                        ]
+                    )
+
+        self.assertEqual(code, 0)
+        inspect_mock.assert_called_once_with(
+            "3QFHLJgXCmQm2Q",
+            ANY,
+            proxy_url="http://127.0.0.1:7890",
+        )
+
     def test_rerun_failed_rejects_direct_urls(self) -> None:
         stderr = io.StringIO()
         with redirect_stderr(stderr), patch("googleart_download.cli.build_reporter", return_value=DummyReporter()):
@@ -224,6 +248,7 @@ class CliTests(unittest.TestCase):
         inspect_mock.assert_called_once_with(
             "https://artsandculture.google.com/asset/-wHFDKu7-mhjtQ",
             ANY,
+            proxy_url=None,
         )
 
     def test_single_url_metadata_only_falls_back_to_google_art_filename_when_title_missing(self) -> None:
@@ -408,6 +433,38 @@ class CliTests(unittest.TestCase):
         )
         self.assertEqual(kwargs["batch_state_file"], "downloads/.googleart-batch-rerun-state.json")
         reporter.log.assert_any_call("Loaded 2 failed artwork(s) from downloads/.googleart-batch-state.json")
+
+    def test_main_passes_proxy_to_batch_manager_and_canonicalization(self) -> None:
+        reporter = MagicMock()
+        fake_manager = MagicMock()
+        fake_manager.run.return_value = BatchRunResult(snapshot=BatchSnapshot(tasks=[]), succeeded=[], failed=[])
+
+        with patch("googleart_download.cli.build_reporter", return_value=reporter):
+            with patch(
+                "googleart_download.cli.canonicalize_batch_urls",
+                return_value=(["https://artsandculture.google.com/asset/example/id"], []),
+            ) as canonicalize_mock:
+                with patch("googleart_download.cli.BatchDownloadManager", return_value=fake_manager) as manager_cls:
+                    with patch("googleart_download.cli.render_summary"):
+                        code = cli.main(
+                            [
+                                "https://artsandculture.google.com/asset/example/id",
+                                "https://g.co/arts/example",
+                                "--proxy",
+                                "http://127.0.0.1:7890",
+                            ]
+                        )
+
+        self.assertEqual(code, 0)
+        canonicalize_mock.assert_called_once_with(
+            [
+                "https://artsandculture.google.com/asset/example/id",
+                "https://g.co/arts/example",
+            ],
+            ANY,
+            proxy_url="http://127.0.0.1:7890",
+        )
+        self.assertEqual(manager_cls.call_args.kwargs["proxy_url"], "http://127.0.0.1:7890")
 
     def test_rerun_failed_exits_cleanly_when_no_failed_tasks_exist(self) -> None:
         reporter = MagicMock()
