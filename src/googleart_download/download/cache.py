@@ -34,6 +34,21 @@ def cache_matches_asset(cache_dir: Path, asset_url: str) -> bool:
     return state is not None and state.get("asset_url") == asset_url
 
 
+def cache_has_complete_tiles(cache_dir: Path, asset_url: str, jobs: list[TileJob]) -> bool:
+    state = _read_cache_state(cache_dir)
+    if state is None or state.get("asset_url") != asset_url:
+        return False
+    if state.get("completed_tiles") != len(jobs):
+        return False
+    if state.get("total_tiles") != len(jobs):
+        return False
+    if state.get("stage") != "downloaded":
+        return False
+
+    tiles_dir = cache_dir / "tiles"
+    return all(tile_cache_path(tiles_dir, job).exists() for job in jobs)
+
+
 def _find_legacy_cache_dir(output_dir: Path, output_path: Path) -> Path | None:
     cache_root = output_dir / ".googleart-cache"
     if not cache_root.exists():

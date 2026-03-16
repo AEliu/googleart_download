@@ -21,6 +21,7 @@ from ..models import (
 )
 from ..reporting import Reporter
 from .cache import (
+    cache_has_complete_tiles,
     cache_matches_asset,
     clear_cache_dir,
     ensure_cache_layout,
@@ -149,6 +150,23 @@ def download_artwork(
             reporter.log(f"Tile directory belongs to a different artwork, clearing stale tiles: {output_path}")
             clear_cache_dir(output_path)
 
+        jobs = build_jobs(page, tile_info, selected_level)
+        if (
+            tile_only
+            and output_conflict_policy is OutputConflictPolicy.SKIP
+            and output_path.exists()
+            and cache_has_complete_tiles(output_path, canonical_asset_url, jobs)
+        ):
+            return DownloadResult(
+                url=canonical_asset_url,
+                output_path=output_path,
+                title=page.title,
+                size=None,
+                tile_count=None,
+                skipped=True,
+                tile_only=True,
+            )
+
         cache_dir = (
             output_path if tile_only else resolve_artwork_cache_dir(output_dir, canonical_asset_url, output_path)
         )
@@ -165,7 +183,6 @@ def download_artwork(
         )
         reporter.artwork_started(context)
 
-        jobs = build_jobs(page, tile_info, selected_level)
         cached_tiles = sum(1 for job in jobs if tile_cache_path(tiles_dir, job).exists())
         if cached_tiles:
             reporter.log(f"Cache directory: {cache_dir}")
@@ -221,16 +238,6 @@ def download_artwork(
             stage="downloaded" if tile_only else "stitching",
         )
         if tile_only:
-            if output_conflict_policy is OutputConflictPolicy.SKIP and output_path.exists() and len(tiles) == len(jobs):
-                return DownloadResult(
-                    url=canonical_asset_url,
-                    output_path=output_path,
-                    title=page.title,
-                    size=(tile_info.image_width_for(selected_level), tile_info.image_height_for(selected_level)),
-                    tile_count=len(jobs),
-                    skipped=False,
-                    tile_only=True,
-                )
             reporter.log(f"Tiles saved: {output_path}")
             return DownloadResult(
                 url=canonical_asset_url,

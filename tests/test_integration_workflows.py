@@ -301,6 +301,76 @@ class CliIntegrationWorkflowTests(unittest.TestCase):
             state_payload = json.loads((visible_tiles_dir / "state.json").read_text(encoding="utf-8"))
             self.assertEqual(state_payload["asset_url"], page.asset_url)
 
+    def test_download_artwork_tile_only_skip_returns_skipped_for_complete_existing_tiles(self) -> None:
+        page = PageInfo(
+            title="The Great Wave",
+            base_url="https://lh3.googleusercontent.com/example",
+            token="token",
+            asset_url="https://artsandculture.google.com/asset/example/id",
+            metadata=None,
+        )
+        tile_info = TileInfo(
+            tile_width=8,
+            tile_height=8,
+            levels=[PyramidLevel(z=0, num_tiles_x=1, num_tiles_y=1, empty_pels_x=0, empty_pels_y=0)],
+        )
+        jobs = [TileJob(z=0, x=0, y=0, url="https://example.com/tile")]
+        assert page.asset_url is not None
+
+        with TemporaryDirectory() as tmpdir:
+            output_dir = Path(tmpdir)
+            visible_tiles_dir = output_dir / "The Great Wave.tiles"
+            tile_path = visible_tiles_dir / "tiles" / "0-0-0.tile"
+            tile_path.parent.mkdir(parents=True, exist_ok=True)
+            tile_path.write_bytes(b"ready-tile")
+            (visible_tiles_dir / "state.json").write_text(
+                json.dumps(
+                    {
+                        "asset_url": page.asset_url,
+                        "completed_tiles": 1,
+                        "total_tiles": 1,
+                        "stage": "downloaded",
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with patch("googleart_download.download.downloader.HttpClient") as client_cls:
+                client = client_cls.return_value.__enter__.return_value
+                client.fetch_text_with_url.return_value = ("<html></html>", page.asset_url)
+                client.fetch_bytes.return_value = b"tile-metadata"
+
+                with patch("googleart_download.download.downloader.parse_page_info", return_value=page):
+                    with patch("googleart_download.download.downloader.parse_tile_info", return_value=tile_info):
+                        with patch("googleart_download.download.downloader.build_jobs", return_value=jobs):
+                            with patch(
+                                "googleart_download.download.downloader.await_download_tiles"
+                            ) as await_download_tiles_mock:
+                                result = download_artwork(
+                                    url=page.asset_url,
+                                    output_dir=output_dir,
+                                    filename=None,
+                                    workers=1,
+                                    jpeg_quality=85,
+                                    retry_config=RetryConfig(attempts=1),
+                                    download_size=DownloadSize.MAX,
+                                    max_dimension=None,
+                                    output_conflict_policy=OutputConflictPolicy.SKIP,
+                                    write_metadata=False,
+                                    write_sidecar=False,
+                                    tile_only=True,
+                                    stitch_backend=StitchBackend.AUTO,
+                                    reporter=SilentReporter(),
+                                    index=1,
+                                    total=1,
+                                )
+
+            await_download_tiles_mock.assert_not_called()
+            self.assertTrue(result.skipped)
+            self.assertTrue(result.tile_only)
+            self.assertEqual(result.output_path, visible_tiles_dir)
+            self.assertEqual(tile_path.read_bytes(), b"ready-tile")
+
     def test_resume_batch_via_cli_reuses_saved_state(self) -> None:
         first_url = "https://artsandculture.google.com/asset/example/one"
         second_url = "https://artsandculture.google.com/asset/example/two"
