@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import deque
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta
 from threading import Lock
 from time import monotonic
 
@@ -83,6 +84,13 @@ def _format_eta(seconds: float | None) -> str:
     if hours:
         return f"{hours:d}:{minutes:02d}:{remaining_seconds:02d}"
     return f"{minutes:02d}:{remaining_seconds:02d}"
+
+
+def _format_finish_time(seconds: float | None) -> str:
+    if seconds is None:
+        return "--:--"
+    finish_at = datetime.now() + timedelta(seconds=max(0, seconds))
+    return finish_at.strftime("%H:%M")
 
 
 class Reporter:
@@ -198,7 +206,7 @@ class RichCliReporter(Reporter):
                 retries = self.telemetry.retries
             description = (
                 f"{self.current_task_label} | {completed}/{total} tiles | "
-                f"{rate:.1f} tiles/s | ETA {_format_eta(eta)} | retries {retries}"
+                f"{rate:.1f} tiles/s | ETA {_format_eta(eta)} | Finish ~ {_format_finish_time(eta)} | retries {retries}"
             )
             self.progress.update(self.tile_task_id, completed=completed, total=total, description=description)
 
@@ -265,6 +273,7 @@ class RichTuiReporter(Reporter):
         self.stitching_in_progress = False
         self.current_rate = "-"
         self.current_eta = "-"
+        self.current_finish_time = "-"
         self.current_phase = "idle"
         self.current_retries = 0
         self.telemetry = ArtworkProgressTelemetry()
@@ -314,6 +323,7 @@ class RichTuiReporter(Reporter):
         summary.add_row("Phase", self.current_phase)
         summary.add_row("Rate", self.current_rate)
         summary.add_row("ETA", self.current_eta)
+        summary.add_row("Finish", self.current_finish_time)
         summary.add_row("Retries", str(self.current_retries))
         summary.add_row("Batch", f"{self.completed_artworks}/{self.total_artworks}")
         summary.add_row("Skipped", str(self.skipped_artworks))
@@ -364,6 +374,7 @@ class RichTuiReporter(Reporter):
         self.stitching_in_progress = False
         self.current_rate = "-"
         self.current_eta = "--:--"
+        self.current_finish_time = "--:--"
         with self._lock:
             self.telemetry.reset(total_tiles, preserve_retries=True)
             self.current_retries = self.telemetry.retries
@@ -393,6 +404,7 @@ class RichTuiReporter(Reporter):
         self.current_phase = "downloading"
         self.current_rate = f"{rate:.1f} tiles/s" if rate > 0 else "-"
         self.current_eta = _format_eta(eta)
+        self.current_finish_time = _format_finish_time(eta)
         self.current_retries = retries
         self.current_tiles = f"{completed}/{total} ({self.current_tile_total} total)"
         self.progress.update(self.tile_task_id, completed=completed, total=total, description="Tiles")
@@ -409,6 +421,7 @@ class RichTuiReporter(Reporter):
         self.current_phase = "stitching"
         self.current_rate = "-"
         self.current_eta = "--:--"
+        self.current_finish_time = "--:--"
         self.stitching_in_progress = True
         with self._lock:
             self.telemetry.mark_phase("stitching")
