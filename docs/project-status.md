@@ -17,6 +17,8 @@ The project currently supports:
 - size inspection via `--list-sizes`
 - metadata-only inspection via `--metadata-only`
 - default metadata-only file output for single-url runs
+- official Google short links via `g.co/arts/...`
+- direct artwork asset-id input such as `3QFHLJgXCmQm2Q`
 - skip-existing behavior by default, with `--no-skip-existing` override
 - single-artwork tile cache reuse across reruns
 - conservative memory guard before stitching extremely large images
@@ -107,6 +109,7 @@ Metadata domain:
 - full interactive TUI
 - multi-artwork parallel batch scheduling
 - packaging and release polish
+- consider limited support for third-party short links only when they can be resolved safely to a canonical Google Arts artwork URL
 
 ## Notes
 

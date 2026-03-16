@@ -26,8 +26,8 @@ from .tiles import build_jobs, download_tiles
 def inspect_artwork_sizes(url: str, retry_config: RetryConfig) -> tuple[str, list[SizeOption]]:
     with HttpClient(retry_config=retry_config) as http_client:
         asset_url = normalize_asset_url(url)
-        html = http_client.fetch_text(asset_url, description="artwork page")
-        page = parse_page_info(html)
+        html, fetched_url = http_client.fetch_text_with_url(asset_url, description="artwork page")
+        page = parse_page_info(html, fetched_url=fetched_url)
         tile_info = parse_tile_info(http_client.fetch_bytes(page.tile_info_url, description="tile metadata"))
         return page.title, list_size_options(tile_info)
 
@@ -35,10 +35,11 @@ def inspect_artwork_sizes(url: str, retry_config: RetryConfig) -> tuple[str, lis
 def inspect_artwork_metadata(url: str, retry_config: RetryConfig) -> JsonObject:
     with HttpClient(retry_config=retry_config) as http_client:
         asset_url = normalize_asset_url(url)
-        html = http_client.fetch_text(asset_url, description="artwork page")
-        page = parse_page_info(html)
+        html, fetched_url = http_client.fetch_text_with_url(asset_url, description="artwork page")
+        page = parse_page_info(html, fetched_url=fetched_url)
+        canonical_asset_url = page.asset_url or normalize_asset_url(fetched_url)
         payload: JsonObject = metadata_to_dict(page.metadata) if page.metadata is not None else {}
-        payload["asset_url"] = asset_url
+        payload["asset_url"] = canonical_asset_url
         payload.setdefault("title", page.title)
         return payload
 
@@ -64,8 +65,11 @@ def download_artwork(
         asset_url = normalize_asset_url(url)
         logger.info("Fetching artwork page: %s", asset_url)
         reporter.log(f"Fetching artwork page: {asset_url}")
-        html = http_client.fetch_text(asset_url, description="artwork page")
-        page = parse_page_info(html)
+        html, fetched_url = http_client.fetch_text_with_url(asset_url, description="artwork page")
+        page = parse_page_info(html, fetched_url=fetched_url)
+        canonical_asset_url = page.asset_url or normalize_asset_url(fetched_url)
+        if canonical_asset_url != asset_url:
+            reporter.log(f"Canonical artwork URL: {canonical_asset_url}")
         original_output_path = resolve_output_path(
             output_dir,
             filename,
@@ -84,7 +88,7 @@ def download_artwork(
         if skip_existing and output_path.exists():
             sidecar_path = output_path.with_suffix(output_path.suffix + ".json") if write_sidecar else None
             return DownloadResult(
-                url=asset_url,
+                url=canonical_asset_url,
                 output_path=output_path,
                 title=page.title,
                 size=None,
@@ -93,13 +97,13 @@ def download_artwork(
                 sidecar_path=sidecar_path if sidecar_path and sidecar_path.exists() else None,
             )
 
-        cache_dir = resolve_artwork_cache_dir(output_dir, asset_url, output_path)
+        cache_dir = resolve_artwork_cache_dir(output_dir, canonical_asset_url, output_path)
         tiles_dir = ensure_cache_layout(cache_dir)
 
         context = ArtworkContext(
             index=index,
             total=total,
-            url=asset_url,
+            url=canonical_asset_url,
             page=page,
             tile_info=tile_info,
             selected_level=selected_level,
@@ -166,7 +170,7 @@ def download_artwork(
         clear_cache_dir(cache_dir)
 
         return DownloadResult(
-            url=asset_url,
+            url=canonical_asset_url,
             output_path=output_path,
             title=page.title,
             size=(tile_info.image_width_for(selected_level), tile_info.image_height_for(selected_level)),

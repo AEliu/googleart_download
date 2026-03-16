@@ -8,7 +8,7 @@ from tempfile import TemporaryDirectory
 from googleart_download.cli import resolve_default_metadata_output_path
 from googleart_download.metadata import metadata_to_dict, write_metadata_sidecar
 from googleart_download.models import ArtworkMetadata, DownloadSize
-from googleart_download.metadata.parsers import normalize_asset_url, parse_artwork_metadata
+from googleart_download.metadata.parsers import normalize_asset_url, parse_artwork_metadata, parse_page_info
 
 
 class MetadataOutputTests(unittest.TestCase):
@@ -68,6 +68,34 @@ class MetadataOutputTests(unittest.TestCase):
             "https://artsandculture.google.com/asset/%E6%98%9F%E5%A4%9C-"
             "%E6%96%87%E6%A3%AE%E7%89%B9%C2%B7%E6%A2%B5%C2%B7%E9%AB%98/bgEuwDxel93-Pg",
         )
+
+    def test_normalize_asset_url_strips_query_and_fragment(self) -> None:
+        normalized = normalize_asset_url(
+            "https://artsandculture.google.com/asset/example/id?ms=%7B%7D#details"
+        )
+        self.assertEqual(normalized, "https://artsandculture.google.com/asset/example/id")
+
+    def test_normalize_asset_url_accepts_bare_asset_id(self) -> None:
+        normalized = normalize_asset_url("3QFHLJgXCmQm2Q")
+        self.assertEqual(normalized, "https://artsandculture.google.com/asset/3QFHLJgXCmQm2Q")
+
+    def test_parse_page_info_uses_canonical_asset_url_from_og_url(self) -> None:
+        html = """
+        <html>
+          <head>
+            <title>Artwork — Google Arts &amp; Culture</title>
+            <meta property="og:url" content="https://artsandculture.google.com/asset/example/id?ms=%7B%7D">
+          </head>
+          <body>
+            ]\n,"//lh3.googleusercontent.com/ci/example",null
+          </body>
+        </html>
+        """
+
+        page = parse_page_info(html, fetched_url="https://g.co/arts/example")
+
+        self.assertEqual(page.title, "Artwork")
+        self.assertEqual(page.asset_url, "https://artsandculture.google.com/asset/example/id")
 
     def test_metadata_to_dict_can_be_used_for_metadata_only_payload(self) -> None:
         metadata = ArtworkMetadata(title="Artwork Title", creator="Artist Name", source_url="https://example.com/art")

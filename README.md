@@ -60,6 +60,12 @@ uv run googleart-download "https://artsandculture.google.com/asset/recto-the-fet
 uv run googleart-download "https://artsandculture.google.com/asset/recto-the-fetus-in-the-womb-verso-notes-on-reproduction-with-sketches-of-a-fetus-in-utero-etc-leonardo-da-vinci/qgFUAw5Zc1wsbw" -o downloads -f fetus.jpg
 ```
 
+如果你已经知道作品的 asset id，也可以直接传短一点的标识：
+
+```bash
+uv run googleart-download "3QFHLJgXCmQm2Q" --size preview
+```
+
 提高 tile 下载并发：
 
 ```bash
@@ -213,6 +219,9 @@ uv run googleart-download "https://artsandculture.google.com/asset/..." --log-fi
 
 - 需要完整的作品页 URL。你给的示例链接少了最后的作品 ID，正确格式通常是 `/asset/<slug>/<assetId>`。
 - 如果从终端或聊天窗口复制 URL 时混入了换行或空格，程序会先清理这些空白字符再继续解析。
+- 支持标准 Google Arts & Culture 作品页 URL，也支持 Google 官方短链接 `g.co/arts/...`。
+- 也支持直接输入作品的 asset id，例如 `3QFHLJgXCmQm2Q`，程序会自动解析到对应作品页。
+- 作品页 URL 里的查看参数（例如 `?ms=...`）会在内部规范化，不会影响缓存、元数据提取和正常下载。
 - 程序当前面向单张作品页，不处理整个合集或故事页。
 - `--workers` 控制单张作品内部的 tile 下载并发数。默认值是自动计算的，通常不需要手动改；网络好、机器资源足够时可以适当调高，但过高可能触发限速、重试增多，甚至整体更慢。
 - 如果大图下载过程中出现单个 tile 的 SSL / EOF / timeout 之类网络错误，通常可以直接重跑；已下载 tile 会从缓存复用。此时优先尝试提高 `--retries`，必要时再适当降低 `--workers`。

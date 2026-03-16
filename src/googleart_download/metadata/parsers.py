@@ -9,9 +9,14 @@ from xml.etree import ElementTree
 from ..errors import DownloadError
 from ..models import ArtworkMetadata, PageInfo, PyramidLevel, TileInfo
 
+ASSET_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{10,}$")
+
 
 def normalize_asset_url(url: str) -> str:
     url = re.sub(r"\s+", "", url)
+    if ASSET_ID_PATTERN.fullmatch(url):
+        return f"https://artsandculture.google.com/asset/{url}"
+
     parsed = urllib.parse.urlparse(url)
     if not parsed.scheme:
         url = f"https://{url.lstrip('/')}"
@@ -20,7 +25,8 @@ def normalize_asset_url(url: str) -> str:
     if parsed.netloc not in {"artsandculture.google.com", "g.co"}:
         raise DownloadError("only Google Arts & Culture asset URLs are supported")
 
-    return url
+    cleaned = parsed._replace(params="", query="", fragment="")
+    return urllib.parse.urlunparse(cleaned)
 
 
 def html_unescape(text: str) -> str:
@@ -93,7 +99,7 @@ def parse_artwork_metadata(html: str, fallback_url: str, fallback_title: str) ->
     )
 
 
-def parse_page_info(html: str) -> PageInfo:
+def parse_page_info(html: str, fetched_url: str | None = None) -> PageInfo:
     title_match = re.search(r"<title>(.*?)</title>", html, re.S | re.I)
     title = title_match.group(1).replace("— Google Arts &amp; Culture", "").strip() if title_match else "google-art"
     title = html_unescape(title)
@@ -103,13 +109,15 @@ def parse_page_info(html: str) -> PageInfo:
         raise DownloadError("could not find tile base URL in page HTML")
 
     page_url_match = re.search(r'<meta property="og:url" content="([^"]+)"', html)
-    page_url = page_url_match.group(1) if page_url_match else ""
+    page_url = page_url_match.group(1) if page_url_match else (fetched_url or "")
+    normalized_page_url = normalize_asset_url(page_url) if page_url else None
     metadata = parse_artwork_metadata(html, fallback_url=page_url, fallback_title=title)
 
     return PageInfo(
         title=title,
         base_url=f"https:{match.group(1)}",
         token=match.group(2) or "",
+        asset_url=normalized_page_url,
         metadata=metadata,
     )
 

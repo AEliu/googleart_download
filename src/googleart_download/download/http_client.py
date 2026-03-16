@@ -38,13 +38,16 @@ class HttpClient:
         self.close()
 
     def fetch_bytes(self, url: str, *, description: str) -> bytes:
+        return self.fetch_bytes_with_url(url, description=description)[0]
+
+    def fetch_bytes_with_url(self, url: str, *, description: str) -> tuple[bytes, str]:
         last_error: Exception | None = None
 
         for attempt in range(1, self.retry_config.attempts + 1):
             try:
                 response = self.client.get(url)
                 response.raise_for_status()
-                return response.content
+                return response.content, str(response.url)
             except httpx.HTTPStatusError as exc:
                 last_error = exc
                 status_code = exc.response.status_code
@@ -61,7 +64,11 @@ class HttpClient:
         raise DownloadError(f"{description} failed after retries: {url} -> {last_error}")
 
     def fetch_text(self, url: str, *, description: str) -> str:
-        return self.fetch_bytes(url, description=description).decode("utf-8", errors="ignore")
+        return self.fetch_text_with_url(url, description=description)[0]
+
+    def fetch_text_with_url(self, url: str, *, description: str) -> tuple[str, str]:
+        content, final_url = self.fetch_bytes_with_url(url, description=description)
+        return content.decode("utf-8", errors="ignore"), final_url
 
     def _should_retry_http(self, status_code: int, attempt: int) -> bool:
         return attempt < self.retry_config.attempts and status_code in self.retry_config.retry_http_statuses

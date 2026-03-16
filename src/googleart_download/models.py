@@ -14,6 +14,7 @@ class PageInfo:
     title: str
     base_url: str
     token: str
+    asset_url: str | None = None
     metadata: "ArtworkMetadata | None" = None
 
     @property

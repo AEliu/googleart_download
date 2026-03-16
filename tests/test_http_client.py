@@ -72,6 +72,18 @@ class HttpClientTests(unittest.TestCase):
 
         self.assertEqual(payload, "hello")
 
+    def test_fetch_text_with_url_returns_final_response_url(self) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, request=request, content="hello".encode("utf-8"))
+
+        client = httpx.Client(transport=httpx.MockTransport(handler))
+
+        with HttpClient(retry_config=RetryConfig(attempts=1, backoff_base_seconds=0), client=client) as http_client:
+            payload, final_url = http_client.fetch_text_with_url("https://g.co/arts/example", description="page")
+
+        self.assertEqual(payload, "hello")
+        self.assertEqual(final_url, "https://g.co/arts/example")
+
 
 if __name__ == "__main__":
     unittest.main()
