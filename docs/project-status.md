@@ -20,6 +20,7 @@ The project currently supports:
 - default metadata-only file output for single-url runs
 - official Google short links via `g.co/arts/...`
 - direct artwork asset-id input such as `3QFHLJgXCmQm2Q`
+- batch input deduplication across equivalent artwork forms such as canonical URLs, `?ms=...` variants, `g.co/arts/...`, and bare asset ids
 - skip-existing behavior by default, with `--no-skip-existing` override
 - single-artwork tile cache reuse across reruns
 - conservative memory guard before stitching extremely large images

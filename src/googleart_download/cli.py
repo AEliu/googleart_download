@@ -10,10 +10,12 @@ from rich.console import Console
 from rich.table import Table
 
 from .batch import BatchDownloadManager
+from .download.http_client import HttpClient
 from .download.downloader import inspect_artwork_metadata, inspect_artwork_sizes
 from .download.image_writer import resolve_output_path
 from .errors import DownloadError, build_error_guidance
 from .logging_utils import configure_logging
+from .metadata.parsers import extract_asset_id, normalize_asset_url
 from .models import BatchRunResult, DownloadSize, JsonObject, RetryConfig, SizeOption, StitchBackend
 from .reporters import build_reporter
 
@@ -185,6 +187,45 @@ def validate_cli_args(args: argparse.Namespace, urls: list[str]) -> None:
         raise DownloadError("--list-sizes requires exactly one artwork URL")
 
 
+def _needs_url_resolution(url: str) -> bool:
+    normalized = normalize_asset_url(url)
+    if normalized.startswith("https://g.co/"):
+        return True
+    parts = [part for part in normalized.split("/") if part]
+    return len(parts) >= 4 and parts[-2] == "asset"
+
+
+def canonicalize_batch_urls(urls: list[str], retry_config: RetryConfig) -> tuple[list[str], list[str]]:
+    unique_urls: list[str] = []
+    duplicate_messages: list[str] = []
+    seen_by_asset_id: dict[str, str] = {}
+    seen_by_url: set[str] = set()
+
+    with HttpClient(retry_config=retry_config) as http_client:
+        for raw_url in urls:
+            normalized_url = normalize_asset_url(raw_url)
+            canonical_url = normalized_url
+            if _needs_url_resolution(normalized_url):
+                canonical_url = normalize_asset_url(
+                    http_client.resolve_url(normalized_url, description="artwork URL resolution")
+                )
+
+            asset_id = extract_asset_id(canonical_url)
+            identity_key = asset_id or canonical_url
+            if identity_key in seen_by_asset_id or canonical_url in seen_by_url:
+                original = seen_by_asset_id.get(identity_key) or canonical_url
+                duplicate_messages.append(
+                    f"Duplicate artwork input skipped: {raw_url} -> {canonical_url} (same artwork as {original})"
+                )
+                continue
+
+            unique_urls.append(canonical_url)
+            seen_by_asset_id[identity_key] = canonical_url
+            seen_by_url.add(canonical_url)
+
+    return unique_urls, duplicate_messages
+
+
 def render_size_options(title: str, options: list[SizeOption]) -> None:
     console = Console()
     table = Table(title=f"Available Sizes: {title}", header_style="bold cyan")
@@ -316,8 +357,15 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 0
         if args.metadata_only:
             return run_metadata_only(args, urls, retry_config)
+        canonical_urls = urls
+        if len(urls) > 1:
+            canonical_urls, duplicate_messages = canonicalize_batch_urls(urls, retry_config)
+            for message in duplicate_messages:
+                reporter.log(message)
+            if len(canonical_urls) != len(urls):
+                reporter.log(f"Batch input normalized from {len(urls)} URL(s) to {len(canonical_urls)} unique artwork(s)")
         manager = BatchDownloadManager(
-            urls=urls,
+            urls=canonical_urls,
             output_dir=Path(args.output_dir),
             filename=args.filename,
             workers=max(1, args.workers),

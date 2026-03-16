@@ -29,6 +29,17 @@ def normalize_asset_url(url: str) -> str:
     return urllib.parse.urlunparse(cleaned)
 
 
+def extract_asset_id(url: str) -> str | None:
+    normalized = normalize_asset_url(url)
+    parsed = urllib.parse.urlparse(normalized)
+    if parsed.netloc != "artsandculture.google.com":
+        return None
+    parts = [part for part in parsed.path.split("/") if part]
+    if len(parts) >= 2 and parts[0] == "asset":
+        return parts[-1] or None
+    return None
+
+
 def html_unescape(text: str) -> str:
     return (
         text.replace("&amp;", "&")
