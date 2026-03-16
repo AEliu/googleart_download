@@ -142,6 +142,8 @@ Repo quality and automation:
 - revisit README screenshot presentation:
   - current generated TUI and large-image previews are accurate but still not readable enough in some web and mobile layouts
   - refine the documentation visual strategy later instead of continuing ad hoc tweaks now
+- consider adding a minimal `SECURITY.md` if the project starts receiving broader public usage or vulnerability reports
+- consider adding a short release/versioning process note once release cadence becomes more regular
 
 ### Low priority
 
