@@ -245,7 +245,7 @@ uv run googleart-download "https://artsandculture.google.com/asset/..." --log-fi
 - `--output-conflict` 控制目标文件已存在时的行为：
   - `skip`：跳过，默认行为
   - `overwrite`：覆盖已有输出
-  - `rename`：自动改成 `.2`、`.3` 这类不冲突文件名
+  - `rename`：自动保存为 `.2`、`.3` 这类不冲突文件名
 - `--no-skip-existing` 是兼容旧写法，等价于 `--output-conflict overwrite`；不要和 `--output-conflict` 同时使用。
 - `--list-sizes` 只适用于单个 URL；它会读取页面和瓦片元数据后直接退出，不会开始图片下载。
 - `--metadata-only` 只抓作品页元信息并输出 JSON，不会下载 tile 或生成图片文件。
@@ -263,8 +263,8 @@ uv run googleart-download "https://artsandculture.google.com/asset/..." --log-fi
 - 下载时会把单张作品的 tile 临时缓存到输出目录下的 `.googleart-cache/`。如果下载过程中中断，下次运行会自动复用已经完成的 tile。
 - 单张作品成功写出后，会默认清理对应的 tile 缓存；失败时缓存会保留，便于恢复。
 - 批量下载还会把任务状态写到输出目录下的 `.googleart-batch-state.json`。这和 tile 缓存是两层恢复能力：tile 缓存负责单作品内的瓦片复用，batch state 负责整批 URL 的任务状态恢复。
-- `--resume-batch` 会从 batch state 文件恢复任务状态：已成功/已跳过任务默认不再重跑，失败和待处理任务继续执行；上次中断时停在 `running` 的任务会回退成 `pending` 再执行。
-- `--rerun-failed` 会直接从 batch state 文件里提取上次失败的任务，启动一个新的小批次；它不需要你重新提供整批 URL。
+- `--resume-batch` 用于恢复一个被中断的整批任务：已成功/已跳过任务默认不再重跑，失败和待处理任务继续执行；上次中断时停在 `running` 的任务会回退成 `pending` 再执行。
+- `--rerun-failed` 用于从 batch state 文件里提取上次失败的任务，启动一个新的小批次；它不需要你重新提供整批 URL。
 - `--rerun-failed` 默认会把新的运行状态写到单独的 rerun state 文件，避免覆盖原始 batch state。
 - `--batch-state-file` 可以指定自定义状态文件路径；如果不传，默认使用 `<output-dir>/.googleart-batch-state.json`。
 - `--resume-batch` 和 `--rerun-failed` 不能一起使用；这两个参数也都不能和 `--list-sizes`、`--metadata-only` 一起使用。

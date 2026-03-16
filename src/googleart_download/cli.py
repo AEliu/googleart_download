@@ -80,16 +80,16 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--resume-batch",
         action="store_true",
-        help="resume batch task state from the state file instead of starting a fresh batch",
+        help="resume an interrupted batch from the state file; succeeded and skipped tasks are not rerun",
     )
     parser.add_argument(
         "--rerun-failed",
         action="store_true",
-        help="start a new batch using only the failed tasks recorded in the batch state file",
+        help="start a new batch using only the failed tasks recorded in the state file",
     )
     parser.add_argument(
         "--batch-state-file",
-        help="custom path for the batch state JSON file (default: <output-dir>/.googleart-batch-state.json)",
+        help="custom path for the batch state JSON file used by --resume-batch or --rerun-failed",
     )
     parser.add_argument(
         "--no-skip-existing",
@@ -100,7 +100,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "--output-conflict",
         choices=[policy.value for policy in OutputConflictPolicy],
         default=OutputConflictPolicy.SKIP.value,
-        help="what to do when the target output already exists: skip, overwrite, or rename (default: skip)",
+        help="when output already exists: skip it, overwrite it, or save as a renamed file (default: skip)",
     )
     size_group = parser.add_mutually_exclusive_group()
     size_group.add_argument(
