@@ -1,6 +1,6 @@
 # Project Status
 
-Updated: 2026-03-13
+Updated: 2026-03-16
 
 ## Current state
 
@@ -23,6 +23,7 @@ The project currently supports:
 - official Google short links via `g.co/arts/...`
 - direct artwork asset-id input such as `3QFHLJgXCmQm2Q`
 - batch input deduplication across equivalent artwork forms such as canonical URLs, `?ms=...` variants, `g.co/arts/...`, and bare asset ids
+- metadata-only multi-url deduplication across the same equivalent artwork forms
 - explicit output conflict handling via `--output-conflict skip|overwrite|rename`
 - compatibility override via `--no-skip-existing`
 - single-artwork tile cache reuse across reruns
@@ -66,7 +67,7 @@ Metadata domain:
 - added optional EXIF writing
 - added optional sidecar JSON output
 - added tests and verified they pass
-- pushed local commits to `origin/master`
+- added batch input deduplication, targeted rerun, explicit output conflict policies, and richer size inspection
 
 ## Verified commands
 
@@ -78,12 +79,6 @@ Metadata domain:
 
 ### High priority
 
-- add targeted rerun support for previously failed tasks
-- improve large-job observability:
-  - ETA
-  - tile rate
-  - retry counters
-  - phase display
 - enrich `--list-sizes` output further with optional rough output-size estimates
 - refine size preset thresholds if real-world usage suggests better defaults
 - expand test coverage for:
@@ -99,8 +94,20 @@ Metadata domain:
   - `--workers` and connection-pool sizing alignment
   - finer timeout controls
   - better transport-level observability
+- prepare the next transport-tuning pass with clearer runtime metrics:
+  - request counts by artwork
+  - retry totals by artwork
+  - basic phase timing breakdown for fetch / download / stitch / write
 - unify metadata output options into a clearer mode-based CLI design
 - enrich sidecar JSON with more operational metadata
+- add an opt-in richer metadata export path without breaking the current `--write-sidecar` behavior:
+  - keep the current sidecar JSON as-is for compatibility
+  - evaluate a separate JSON-LD sidecar mode rather than overloading `--write-sidecar`
+  - prefer stable identifiers based on asset id, for example `gac:asset:{assetId}` and `gac:asset:{assetId}:{variant}`
+  - keep metadata output adjacent to the current artifact instead of forcing a new `{partner}/{object}` directory layout
+  - optionally persist raw page JSON-LD snapshots for traceability
+  - optionally emit checksums for the final image and metadata files
+  - evaluate optional XMP writing through `exiftool`, with graceful skip when unavailable
 - support richer batch input formats such as CSV or JSONL
 - improve log and event verbosity controls
 - add EXIF support for the `bigtiff` and `pyvips` stitch backends

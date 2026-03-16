@@ -13,6 +13,12 @@ from googleart_download.models import BatchRunResult, BatchSnapshot, DownloadRes
 
 
 class DummyReporter:
+    def __init__(self) -> None:
+        self.messages: list[str] = []
+
+    def log(self, message: str) -> None:
+        self.messages.append(message)
+
     def close(self) -> None:
         pass
 
@@ -217,6 +223,42 @@ class CliTests(unittest.TestCase):
         payload = json.loads(stdout.getvalue())
         self.assertEqual(payload, [{"title": "One"}, {"title": "Two"}])
         self.assertIn("default to a JSON array on stdout", stderr.getvalue())
+
+    def test_multi_url_metadata_only_dedupes_equivalent_inputs(self) -> None:
+        reporter = DummyReporter()
+        stderr = io.StringIO()
+        with TemporaryDirectory() as tmpdir:
+            with patch(
+                "googleart_download.cli.canonicalize_batch_urls",
+                return_value=(
+                    ["https://artsandculture.google.com/asset/example/canonical"],
+                    ["Duplicate artwork input skipped: duplicate"],
+                ),
+            ):
+                with patch(
+                    "googleart_download.cli.inspect_artwork_metadata",
+                    return_value={"title": "One"},
+                ) as inspect_mock:
+                    with patch("googleart_download.cli.build_reporter", return_value=reporter):
+                        with redirect_stderr(stderr):
+                            code = cli.main(
+                                [
+                                    "https://artsandculture.google.com/asset/example/one",
+                                    "https://g.co/arts/example",
+                                    "--metadata-only",
+                                    "-o",
+                                    tmpdir,
+                                ]
+                            )
+
+            self.assertEqual(code, 0)
+            self.assertEqual(inspect_mock.call_count, 1)
+            output_path = Path(tmpdir) / "One.metadata.json"
+            self.assertTrue(output_path.exists())
+            payload = json.loads(output_path.read_text(encoding="utf-8"))
+            self.assertEqual(payload, [{"title": "One"}])
+        self.assertIn("Duplicate artwork input skipped: duplicate", reporter.messages)
+        self.assertIn("Metadata-only input normalized from 2 URL(s) to 1 unique artwork(s)", reporter.messages)
 
     def test_metadata_output_writes_file_instead_of_stdout(self) -> None:
         with TemporaryDirectory() as tmpdir:

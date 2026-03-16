@@ -18,7 +18,7 @@ from .errors import DownloadError, build_error_guidance
 from .logging_utils import configure_logging
 from .metadata.parsers import extract_asset_id, normalize_asset_url
 from .models import BatchRunResult, DownloadSize, JsonObject, OutputConflictPolicy, RetryConfig, SizeOption, StitchBackend
-from .reporters import build_reporter
+from .reporters import Reporter, build_reporter
 
 
 def _format_bytes(value: int) -> str:
@@ -331,11 +331,28 @@ def resolve_default_metadata_output_path(
     return image_path.with_suffix(".metadata.json")
 
 
-def run_metadata_only(args: argparse.Namespace, urls: list[str], retry_config: RetryConfig) -> int:
-    results = [inspect_artwork_metadata(url, retry_config) for url in urls]
+def run_metadata_only(
+    args: argparse.Namespace,
+    urls: list[str],
+    retry_config: RetryConfig,
+    *,
+    reporter: Reporter | None = None,
+) -> int:
+    canonical_urls = urls
+    if len(urls) > 1:
+        canonical_urls, duplicate_messages = canonicalize_batch_urls(urls, retry_config)
+        for message in duplicate_messages:
+            if reporter is not None:
+                reporter.log(message)
+        if len(canonical_urls) != len(urls) and reporter is not None:
+            reporter.log(
+                f"Metadata-only input normalized from {len(urls)} URL(s) to {len(canonical_urls)} unique artwork(s)"
+            )
+
+    results = [inspect_artwork_metadata(url, retry_config) for url in canonical_urls]
     metadata_output = args.metadata_output
 
-    if metadata_output is None and len(urls) == 1:
+    if metadata_output is None and len(canonical_urls) == 1:
         title = results[0].get("title")
         resolved_title = title if isinstance(title, str) and title else "google-art"
         metadata_output = str(
@@ -347,7 +364,7 @@ def run_metadata_only(args: argparse.Namespace, urls: list[str], retry_config: R
                 max_dimension=args.max_dimension,
             )
         )
-    elif metadata_output is None and len(urls) > 1:
+    elif metadata_output is None and len(canonical_urls) > 1:
         Console(stderr=True).print(
             "[cyan]•[/cyan] Multiple URLs with --metadata-only default to a JSON array on stdout. "
             "Use --metadata-output to save to a file."
@@ -413,7 +430,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             render_size_options(title, options)
             return 0
         if args.metadata_only:
-            return run_metadata_only(args, urls, retry_config)
+            return run_metadata_only(args, urls, retry_config, reporter=reporter)
         if args.rerun_failed:
             failed_urls, source_state_path, rerun_state_path = load_failed_batch_urls(Path(args.output_dir), args.batch_state_file)
             if not failed_urls:
