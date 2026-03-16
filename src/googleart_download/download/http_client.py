@@ -16,11 +16,13 @@ class HttpClient:
         self,
         retry_config: RetryConfig,
         timeout: int = REQUEST_TIMEOUT,
+        proxy_url: str | None = None,
         client: httpx.Client | None = None,
         on_retry: Callable[[str, str, int, str], None] | None = None,
     ) -> None:
         self.retry_config = retry_config
         self.timeout = timeout
+        self.proxy_url = proxy_url
         self.logger = get_logger()
         self.on_retry = on_retry
         self._owns_client = client is None
@@ -28,6 +30,8 @@ class HttpClient:
             headers={"User-Agent": USER_AGENT},
             timeout=timeout,
             follow_redirects=True,
+            proxy=proxy_url,
+            trust_env=proxy_url is None,
         )
 
     def close(self) -> None:

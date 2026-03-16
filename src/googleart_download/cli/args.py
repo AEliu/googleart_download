@@ -104,6 +104,10 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="base backoff in seconds before retrying failed requests (default: 0.75)",
     )
     parser.add_argument(
+        "--proxy",
+        help="proxy URL for artwork page, metadata, and tile requests (for example http://127.0.0.1:7890 or socks5://127.0.0.1:7890)",
+    )
+    parser.add_argument(
         "--rerun-failures",
         type=int,
         default=0,

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import unittest
 from unittest.mock import patch
 
@@ -11,6 +12,26 @@ from googleart_download.models import RetryConfig
 
 
 class HttpClientTests(unittest.TestCase):
+    def test_explicit_proxy_config_disables_environment_proxy_lookup(self) -> None:
+        with patch.dict(os.environ, {"HTTPS_PROXY": "http://env-proxy:8080"}, clear=False):
+            with patch("googleart_download.download.http_client.httpx.Client") as client_cls:
+                HttpClient(
+                    retry_config=RetryConfig(attempts=1, backoff_base_seconds=0),
+                    proxy_url="http://cli-proxy:7890",
+                )
+
+        client_cls.assert_called_once()
+        self.assertEqual(client_cls.call_args.kwargs["proxy"], "http://cli-proxy:7890")
+        self.assertFalse(client_cls.call_args.kwargs["trust_env"])
+
+    def test_default_client_uses_environment_proxy_support(self) -> None:
+        with patch("googleart_download.download.http_client.httpx.Client") as client_cls:
+            HttpClient(retry_config=RetryConfig(attempts=1, backoff_base_seconds=0))
+
+        client_cls.assert_called_once()
+        self.assertIsNone(client_cls.call_args.kwargs["proxy"])
+        self.assertTrue(client_cls.call_args.kwargs["trust_env"])
+
     def test_fetch_bytes_retries_retryable_http_status(self) -> None:
         attempts = {"count": 0}
 

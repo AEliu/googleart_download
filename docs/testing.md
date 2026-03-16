@@ -53,6 +53,7 @@ The manual smoke workflow supports:
 
 - a built-in named smoke case
 - an optional custom artwork input override
+- optional real-world proxy testing by providing an artwork input that requires your network path to be reachable
 
 Built-in real-world smoke cases are tracked in:
 

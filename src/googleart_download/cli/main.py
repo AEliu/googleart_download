@@ -83,7 +83,7 @@ def run_metadata_only(
     if len(urls) > 1:
         from . import canonicalize_batch_urls, inspect_artwork_metadata
 
-        canonical_urls, duplicate_messages = canonicalize_batch_urls(urls, retry_config)
+        canonical_urls, duplicate_messages = canonicalize_batch_urls(urls, retry_config, proxy_url=args.proxy)
         for message in duplicate_messages:
             if reporter is not None:
                 reporter.log(message)
@@ -94,7 +94,7 @@ def run_metadata_only(
 
     from . import inspect_artwork_metadata
 
-    results = [inspect_artwork_metadata(url, retry_config) for url in canonical_urls]
+    results = [inspect_artwork_metadata(url, retry_config, proxy_url=args.proxy) for url in canonical_urls]
     metadata_output = args.metadata_output
 
     if metadata_output is None and len(canonical_urls) == 1:
@@ -137,7 +137,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         batch_state_file = args.batch_state_file
         if args.list_sizes:
-            title, options = inspect_artwork_sizes(urls[0], retry_config)
+            title, options = inspect_artwork_sizes(urls[0], retry_config, proxy_url=args.proxy)
             render_size_options(title, options)
             return 0
         if args.metadata_only:
@@ -155,7 +155,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             batch_state_file = str(rerun_state_path)
         canonical_urls = urls
         if len(urls) > 1:
-            canonical_urls, duplicate_messages = canonicalize_batch_urls(urls, retry_config)
+            canonical_urls, duplicate_messages = canonicalize_batch_urls(urls, retry_config, proxy_url=args.proxy)
             for message in duplicate_messages:
                 reporter.log(message)
             if len(canonical_urls) != len(urls):
@@ -171,6 +171,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             workers=max(1, args.workers),
             jpeg_quality=resolve_jpeg_quality(args),
             retry_config=retry_config,
+            proxy_url=args.proxy,
             reporter=reporter,
             fail_fast=args.fail_fast,
             download_size=DownloadSize(args.size),

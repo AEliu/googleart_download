@@ -124,6 +124,14 @@ uv run googleart-download "3QFHLJgXCmQm2Q" --jpeg-quality 85
 uv run googleart-download "3QFHLJgXCmQm2Q" --jpeg-preset balanced
 ```
 
+如果你的网络无法直接访问 Google Arts，也可以显式指定代理：
+
+```bash
+uv run googleart-download "3QFHLJgXCmQm2Q" --proxy http://127.0.0.1:7890
+```
+
+如果你更习惯环境变量，也可以使用标准的 `HTTPS_PROXY`、`ALL_PROXY` 等变量。显式 `--proxy` 的优先级高于环境变量代理设置。
+
 ## 输出格式说明
 
 普通尺寸作品默认输出 JPEG。

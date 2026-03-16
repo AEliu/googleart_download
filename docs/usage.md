@@ -80,6 +80,28 @@ uv run googleart-download "3QFHLJgXCmQm2Q" --jpeg-preset balanced
 
 `--jpeg-quality` and `--jpeg-preset` cannot be used together.
 
+## Proxy Support
+
+Use an explicit proxy:
+
+```bash
+uv run googleart-download "3QFHLJgXCmQm2Q" --proxy http://127.0.0.1:7890
+```
+
+SOCKS proxies are also supported when your environment and dependencies support them:
+
+```bash
+uv run googleart-download "3QFHLJgXCmQm2Q" --proxy socks5://127.0.0.1:7890
+```
+
+You can also rely on standard proxy environment variables such as:
+
+- `HTTP_PROXY`
+- `HTTPS_PROXY`
+- `ALL_PROXY`
+
+If `--proxy` is provided, it takes precedence over environment proxy settings.
+
 ## Output Naming
 
 By default:

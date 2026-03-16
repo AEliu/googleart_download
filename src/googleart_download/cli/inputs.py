@@ -97,6 +97,7 @@ def canonicalize_batch_urls(
     urls: list[str],
     retry_config: RetryConfig,
     *,
+    proxy_url: str | None = None,
     http_client_cls: type[HttpClient] = HttpClient,
 ) -> tuple[list[str], list[str]]:
     unique_urls: list[str] = []
@@ -104,7 +105,7 @@ def canonicalize_batch_urls(
     seen_by_asset_id: dict[str, str] = {}
     seen_by_url: set[str] = set()
 
-    with http_client_cls(retry_config=retry_config) as http_client:
+    with http_client_cls(retry_config=retry_config, proxy_url=proxy_url) as http_client:
         for raw_url in urls:
             normalized_url = normalize_asset_url(raw_url)
             canonical_url = normalized_url

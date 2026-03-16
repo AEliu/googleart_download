@@ -30,10 +30,12 @@ from .output import (
 )
 
 
-def canonicalize_batch_urls(urls: list[str], retry_config: RetryConfig) -> tuple[list[str], list[str]]:
+def canonicalize_batch_urls(
+    urls: list[str], retry_config: RetryConfig, *, proxy_url: str | None = None
+) -> tuple[list[str], list[str]]:
     from .inputs import canonicalize_batch_urls as _canonicalize_batch_urls
 
-    return _canonicalize_batch_urls(urls, retry_config, http_client_cls=HttpClient)
+    return _canonicalize_batch_urls(urls, retry_config, proxy_url=proxy_url, http_client_cls=HttpClient)
 
 
 __all__ = [

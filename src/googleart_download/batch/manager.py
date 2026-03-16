@@ -29,6 +29,7 @@ class BatchDownloadManager:
         workers: int,
         jpeg_quality: int,
         retry_config: RetryConfig,
+        proxy_url: str | None = None,
         reporter: Reporter,
         fail_fast: bool,
         download_size: DownloadSize,
@@ -47,6 +48,7 @@ class BatchDownloadManager:
         self.workers = workers
         self.jpeg_quality = jpeg_quality
         self.retry_config = retry_config
+        self.proxy_url = proxy_url
         self.reporter = reporter
         self.fail_fast = fail_fast
         self.download_size = download_size
@@ -114,6 +116,7 @@ class BatchDownloadManager:
                         reporter=self.reporter,
                         index=task.index,
                         total=len(self.tasks),
+                        proxy_url=self.proxy_url,
                     )
                 except DownloadError as exc:
                     failed_task = self._update_task(task.index, state=TaskState.FAILED, error=str(exc))
