@@ -331,6 +331,23 @@ class TileCacheTests(unittest.TestCase):
 
         self.assertEqual(first, second)
 
+    def test_resolve_artwork_cache_dir_isolates_different_assets_with_same_output_path(self) -> None:
+        with TemporaryDirectory() as tmpdir:
+            output_dir = Path(tmpdir)
+            output_path = output_dir / "shared-name.jpg"
+            first = resolve_artwork_cache_dir(
+                output_dir,
+                "https://artsandculture.google.com/asset/foo/bgEuwDxel93-Pg",
+                output_path,
+            )
+            second = resolve_artwork_cache_dir(
+                output_dir,
+                "https://artsandculture.google.com/asset/bar/cQH8MTR2h0nZ-Q",
+                output_path,
+            )
+
+        self.assertNotEqual(first, second)
+
     def test_resolve_artwork_cache_dir_migrates_legacy_cache_by_output_path(self) -> None:
         with TemporaryDirectory() as tmpdir:
             output_dir = Path(tmpdir)

@@ -16,9 +16,9 @@ The package uses a `src/` layout and is grouped by domain.
 
 Application layer:
 
-- `src/googleart_download/cli.py`
-- `src/googleart_download/batch.py`
-- `src/googleart_download/reporters.py`
+- `src/googleart_download/cli/`
+- `src/googleart_download/batch/`
+- `src/googleart_download/reporting/`
 - `src/googleart_download/models.py`
 - `src/googleart_download/errors.py`
 - `src/googleart_download/logging_utils.py`
@@ -29,6 +29,8 @@ Download domain:
 - `src/googleart_download/download/downloader.py`
 - `src/googleart_download/download/tiles.py`
 - `src/googleart_download/download/image_writer.py`
+- `src/googleart_download/download/cache.py`
+- `src/googleart_download/download/stitch_from_tiles.py`
 
 Metadata domain:
 

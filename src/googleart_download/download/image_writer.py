@@ -209,14 +209,14 @@ def _stitch_with_pillow(
 
     for y in range(level.num_tiles_y):
         for x in range(level.num_tiles_x):
-            tile = Image.open(tiles[(x, y)])
-            tile.load()
-            left = x * tile_info.tile_width
-            top = y * tile_info.tile_height
-            right = min(left + tile.width, tile_info.image_width)
-            bottom = min(top + tile.height, tile_info.image_height)
-            cropped = tile.crop((0, 0, right - left, bottom - top))
-            image.paste(cropped, (left, top))
+            with Image.open(tiles[(x, y)]) as tile:
+                tile.load()
+                left = x * tile_info.tile_width
+                top = y * tile_info.tile_height
+                right = min(left + tile.width, tile_info.image_width)
+                bottom = min(top + tile.height, tile_info.image_height)
+                cropped = tile.crop((0, 0, right - left, bottom - top))
+                image.paste(cropped, (left, top))
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     _save_with_pillow(image, output_path, metadata, write_metadata, jpeg_quality)

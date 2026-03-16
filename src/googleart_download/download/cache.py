@@ -49,6 +49,29 @@ def cache_has_complete_tiles(cache_dir: Path, asset_url: str, jobs: list[TileJob
     return all(tile_cache_path(tiles_dir, job).exists() for job in jobs)
 
 
+def restore_cache_from_visible_output(cache_dir: Path, visible_output_dir: Path, asset_url: str) -> bool:
+    if cache_dir.exists() or not visible_output_dir.exists():
+        return False
+    if not cache_matches_asset(visible_output_dir, asset_url):
+        return False
+
+    cache_dir.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        shutil.copytree(visible_output_dir, cache_dir)
+    except OSError:
+        if cache_dir.exists():
+            shutil.rmtree(cache_dir, ignore_errors=True)
+        return False
+    return True
+
+
+def write_visible_tile_output(cache_dir: Path, visible_output_dir: Path) -> None:
+    if visible_output_dir.exists():
+        shutil.rmtree(visible_output_dir)
+    visible_output_dir.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(cache_dir, visible_output_dir)
+
+
 def _find_legacy_cache_dir(output_dir: Path, output_path: Path) -> Path | None:
     cache_root = output_dir / ".googleart-cache"
     if not cache_root.exists():
