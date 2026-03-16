@@ -8,8 +8,22 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
+from PIL import Image
+
 from googleart_download import cli
-from googleart_download.models import DownloadResult, OutputConflictPolicy, StitchBackend
+from googleart_download.download.downloader import download_artwork
+from googleart_download.models import (
+    ArtworkMetadata,
+    DownloadResult,
+    DownloadSize,
+    OutputConflictPolicy,
+    PageInfo,
+    PyramidLevel,
+    RetryConfig,
+    StitchBackend,
+    TileInfo,
+    TileJob,
+)
 from googleart_download.reporting import Reporter
 
 
@@ -18,6 +32,80 @@ class SilentReporter(Reporter):
 
 
 class CliIntegrationWorkflowTests(unittest.TestCase):
+    def test_download_artwork_writes_sidecar_and_exif(self) -> None:
+        metadata = ArtworkMetadata(
+            title="The Great Wave",
+            creator="Katsushika Hokusai",
+            description="A famous ukiyo-e print.",
+            source_url="https://artsandculture.google.com/asset/example/id",
+            rights="Public domain",
+        )
+        page = PageInfo(
+            title="The Great Wave",
+            base_url="https://lh3.googleusercontent.com/example",
+            token="token",
+            asset_url="https://artsandculture.google.com/asset/example/id",
+            metadata=metadata,
+        )
+        assert page.asset_url is not None
+        tile_info = TileInfo(
+            tile_width=8,
+            tile_height=8,
+            levels=[PyramidLevel(z=0, num_tiles_x=1, num_tiles_y=1, empty_pels_x=0, empty_pels_y=0)],
+        )
+        jobs = [TileJob(z=0, x=0, y=0, url="https://example.com/tile")]
+
+        with TemporaryDirectory() as tmpdir:
+            output_dir = Path(tmpdir)
+            tile_path = output_dir / "tile.png"
+            Image.new("RGB", (8, 8), (0, 128, 255)).save(tile_path, format="PNG")
+
+            fake_client = SilentReporter()
+
+            with patch("googleart_download.download.downloader.HttpClient") as client_cls:
+                client = client_cls.return_value.__enter__.return_value
+                client.fetch_text_with_url.return_value = ("<html></html>", page.asset_url)
+                client.fetch_bytes.return_value = b"tile-metadata"
+
+                with patch("googleart_download.download.downloader.parse_page_info", return_value=page):
+                    with patch("googleart_download.download.downloader.parse_tile_info", return_value=tile_info):
+                        with patch("googleart_download.download.downloader.build_jobs", return_value=jobs):
+                            with patch(
+                                "googleart_download.download.downloader.download_tiles",
+                                return_value={(0, 0): tile_path},
+                            ):
+                                result = download_artwork(
+                                    url=page.asset_url,
+                                    output_dir=output_dir,
+                                    filename=None,
+                                    workers=1,
+                                    jpeg_quality=85,
+                                    retry_config=RetryConfig(attempts=1),
+                                    download_size=DownloadSize.MAX,
+                                    max_dimension=None,
+                                    output_conflict_policy=OutputConflictPolicy.OVERWRITE,
+                                    write_metadata=True,
+                                    write_sidecar=True,
+                                    stitch_backend=StitchBackend.PILLOW,
+                                    reporter=fake_client,
+                                    index=1,
+                                    total=1,
+                                )
+
+            self.assertTrue(result.output_path.exists())
+            self.assertIsNotNone(result.sidecar_path)
+            assert result.sidecar_path is not None
+            self.assertTrue(result.sidecar_path.exists())
+
+            sidecar_payload = json.loads(result.sidecar_path.read_text(encoding="utf-8"))
+            self.assertEqual(sidecar_payload["title"], "The Great Wave")
+            self.assertEqual(sidecar_payload["creator"], "Katsushika Hokusai")
+
+            with Image.open(result.output_path) as output_image:
+                exif = output_image.getexif()
+                self.assertEqual(exif.get(315), "Katsushika Hokusai")
+                self.assertIn("ukiyo-e", exif.get(270, ""))
+
     def test_resume_batch_via_cli_reuses_saved_state(self) -> None:
         first_url = "https://artsandculture.google.com/asset/example/one"
         second_url = "https://artsandculture.google.com/asset/example/two"
@@ -86,6 +174,65 @@ class CliIntegrationWorkflowTests(unittest.TestCase):
             self.assertEqual(payload["tasks"][0]["attempts"], 1)
             self.assertEqual(payload["tasks"][1]["state"], "succeeded")
             self.assertEqual(payload["tasks"][1]["attempts"], 3)
+
+    def test_skip_and_rerun_failures_combination_via_batch_manager(self) -> None:
+        skipped_url = "https://artsandculture.google.com/asset/example/skipped"
+        flaky_url = "https://artsandculture.google.com/asset/example/flaky"
+
+        with TemporaryDirectory() as tmpdir:
+            calls: list[str] = []
+            failure_count = {"flaky": 0}
+
+            def fake_download_artwork(**kwargs):  # type: ignore[no-untyped-def]
+                url = kwargs["url"]
+                calls.append(url)
+                if url == skipped_url:
+                    return DownloadResult(
+                        url=url,
+                        output_path=Path(tmpdir) / "skipped.jpg",
+                        title="skipped",
+                        size=None,
+                        tile_count=None,
+                        skipped=True,
+                    )
+                if url == flaky_url and failure_count["flaky"] == 0:
+                    failure_count["flaky"] += 1
+                    from googleart_download.errors import DownloadError
+
+                    raise DownloadError("boom")
+                return DownloadResult(
+                    url=url,
+                    output_path=Path(tmpdir) / "flaky.jpg",
+                    title="flaky",
+                    size=(10, 10),
+                    tile_count=1,
+                )
+
+            with patch("googleart_download.batch.download_artwork", side_effect=fake_download_artwork):
+                from googleart_download.batch import BatchDownloadManager
+
+                manager = BatchDownloadManager(
+                    urls=[skipped_url, flaky_url],
+                    output_dir=Path(tmpdir),
+                    filename=None,
+                    workers=1,
+                    jpeg_quality=85,
+                    retry_config=RetryConfig(attempts=1),
+                    reporter=SilentReporter(),
+                    fail_fast=False,
+                    download_size=DownloadSize.MAX,
+                    max_dimension=None,
+                    output_conflict_policy=OutputConflictPolicy.OVERWRITE,
+                    write_metadata=False,
+                    write_sidecar=False,
+                    rerun_failures=1,
+                )
+                run_result = manager.run()
+
+            self.assertEqual(calls.count(skipped_url), 1)
+            self.assertEqual(calls.count(flaky_url), 2)
+            self.assertEqual(run_result.snapshot.skipped, 1)
+            self.assertEqual(run_result.snapshot.succeeded, 1)
 
     def test_rerun_failed_via_cli_creates_rerun_state_and_runs_only_failed_tasks(self) -> None:
         failed_url = "https://artsandculture.google.com/asset/example/failed"
