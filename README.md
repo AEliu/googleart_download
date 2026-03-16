@@ -78,7 +78,9 @@ Export artwork metadata only:
 uv run googleart-download "3QFHLJgXCmQm2Q" --metadata-only
 ```
 
-![Terminal preview](docs/assets/tui-preview.svg)
+<a href="docs/assets/tui-preview.svg">
+  <img src="docs/assets/tui-overview.svg" alt="Terminal preview" />
+</a>
 
 _Screenshot generated from the current TUI output._
 
@@ -127,7 +129,9 @@ Very large artworks automatically switch to TIFF/BigTIFF output. This is intenti
 
 Large-image JPEG conversion is not part of the default path. If you need a JPEG from a very large TIFF result, convert it yourself as a separate post-process step.
 
-![Large artwork TIFF path](docs/assets/large-image-tiff.svg)
+<a href="docs/assets/large-image-tiff.svg">
+  <img src="docs/assets/large-image-overview.svg" alt="Large artwork TIFF path" />
+</a>
 
 _Screenshot generated from the current TUI output._
 

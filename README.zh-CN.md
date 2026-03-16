@@ -80,7 +80,9 @@ uv run googleart-download "3QFHLJgXCmQm2Q" --list-sizes
 uv run googleart-download "3QFHLJgXCmQm2Q" --metadata-only
 ```
 
-![Terminal preview](docs/assets/tui-preview.svg)
+<a href="docs/assets/tui-preview.svg">
+  <img src="docs/assets/tui-overview.svg" alt="Terminal preview" />
+</a>
 
 _截图来自当前 TUI 的真实渲染输出。_
 
@@ -129,7 +131,9 @@ uv run googleart-download "3QFHLJgXCmQm2Q" --jpeg-preset balanced
 
 大图自动转 JPEG 不属于默认下载路径。如果你最终仍然需要 JPEG，建议把生成的 TIFF 作为后处理再转换。
 
-![Large artwork TIFF path](docs/assets/large-image-tiff.svg)
+<a href="docs/assets/large-image-tiff.svg">
+  <img src="docs/assets/large-image-overview.svg" alt="Large artwork TIFF path" />
+</a>
 
 _截图来自当前 TUI 的真实渲染输出。_
 

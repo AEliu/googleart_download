@@ -13,6 +13,12 @@ from googleart_download.reporters import RichTuiReporter
 ASSETS_DIR = Path("docs/assets")
 
 
+def export_svg(output_path: Path, renderable: object, *, width: int = 160) -> None:
+    console = Console(record=True, width=width, file=StringIO())
+    console.print(renderable)
+    output_path.write_text(console.export_svg(title="googleart-download"), encoding="utf-8")
+
+
 def export_reporter_svg(output_path: Path, configure: Callable[[RichTuiReporter], None]) -> None:
     stderr_buffer = StringIO()
     with redirect_stderr(stderr_buffer):
@@ -20,9 +26,7 @@ def export_reporter_svg(output_path: Path, configure: Callable[[RichTuiReporter]
         try:
             configure(reporter)
             reporter.live.stop()
-            console = Console(record=True, width=160, file=StringIO())
-            console.print(reporter.render())
-            output_path.write_text(console.export_svg(title="googleart-download"), encoding="utf-8")
+            export_svg(output_path, reporter.render(), width=160)
         finally:
             reporter.close()
 
@@ -70,6 +74,8 @@ def main() -> None:
     ASSETS_DIR.mkdir(parents=True, exist_ok=True)
     export_reporter_svg(ASSETS_DIR / "tui-preview.svg", build_tui_preview)
     export_reporter_svg(ASSETS_DIR / "large-image-tiff.svg", build_large_image_preview)
+    export_reporter_svg(ASSETS_DIR / "tui-overview.svg", build_tui_preview)
+    export_reporter_svg(ASSETS_DIR / "large-image-overview.svg", build_large_image_preview)
 
 
 if __name__ == "__main__":

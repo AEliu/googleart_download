@@ -131,6 +131,10 @@ Size inspection reports:
 uv run googleart-download --url-file urls.txt --tui --log-file logs/run.log -v
 ```
 
+<a href="assets/tui-preview.svg">
+  <img src="assets/tui-overview.svg" alt="TUI overview" />
+</a>
+
 The CLI can show:
 
 - download rate
