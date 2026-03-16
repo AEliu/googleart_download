@@ -44,10 +44,10 @@ Metadata domain:
 3. Parse artwork metadata and tile metadata URL.
 4. Fetch tile metadata.
 5. Build tile jobs for the highest zoom level.
-6. Download tiles concurrently.
-7. Decrypt tiles when required.
-8. Stitch the full image.
-9. Write the final image file.
+6. Resolve a stable hidden cache directory for that artwork.
+7. Download tiles concurrently, reusing any already cached tiles.
+8. In `--tile-only` mode, export the finished tile set to a visible `.tiles/` directory and keep the hidden cache.
+9. Otherwise stitch the full image, write the final image file, and clear the hidden cache.
 10. Optionally write EXIF and JSON sidecar metadata.
 
 ## Current batch flow
@@ -165,18 +165,24 @@ Large-artwork performance must be treated as three different concerns:
 
 Improving one of these does not automatically solve the others.
 
-## Important next design direction
+## Current implementation details
 
 ### Tile cache and resume
 
-This is the highest-value missing reliability feature.
+Tile cache and resume are already implemented for the single-artwork download path.
 
-Desired behavior:
+Current behavior:
 
 - keep a per-artwork work directory
 - store tile metadata and download state there
 - reuse finished tiles after interruption
 - stitch from cached tiles once the set is complete
+
+For tile-only mode:
+
+- the visible `.tiles/` directory is the user-facing result
+- the hidden cache identity remains based on stable artwork identity under `.googleart-cache/`
+- successful tile-only runs intentionally duplicate tile data into the visible `.tiles/` directory while keeping the hidden cache for later reuse or export
 
 Suggested high-level layout:
 
@@ -196,7 +202,7 @@ Important design constraints:
 - the cache key must use a stable artwork identity
 - do not rely only on title or output filename
 - failed jobs should keep cache by default
-- successful jobs can clean cache by default, with an opt-in keep-cache mode
+- successful stitched jobs can clean cache by default, while tile-only intentionally keeps both hidden cache data and visible `.tiles` output
 - cache schema versioning should be considered early
 
 ### Atomic output writes

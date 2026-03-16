@@ -157,6 +157,12 @@ Large-image JPEG conversion is not part of the default path. If you need a JPEG 
 - `tiles/*.tile` downloaded tile files
 - `state.json` describing the tile-only download state
 
+Internally, tile-only downloads also keep a hidden stable cache under `.googleart-cache/` keyed by artwork identity instead of the visible directory name. This separation is intentional:
+
+- the visible `.tiles/` directory remains the user-facing artifact
+- the hidden cache avoids accidental tile reuse between different artworks that would otherwise collide by output name
+- when tile-only finishes successfully, the visible `.tiles/` directory is materialized from the hidden cache, so tile data is intentionally duplicated in those two locations while the hidden cache is retained
+
 When `--tile-only` is used with `--output-conflict`:
 
 - `skip` reuses a complete existing tile directory for the same artwork and reports it as skipped

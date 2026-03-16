@@ -159,6 +159,12 @@ uv run googleart-download "3QFHLJgXCmQm2Q" --proxy http://127.0.0.1:7890
 - `tiles/*.tile`：下载得到的 tile 文件
 - `state.json`：tile-only 下载状态描述
 
+在内部实现上，tile-only 还会在 `.googleart-cache/` 下保留一个按作品稳定身份命名的隐藏 cache，而不是直接把可见 `.tiles/` 目录当作内部 cache 身份。这样做是刻意的：
+
+- 可见 `.tiles/` 目录继续作为用户可见产物
+- 隐藏 cache 负责正确的 cache identity，避免不同作品仅因输出名相同而误复用 tile
+- tile-only 成功后，会把隐藏 cache 的内容同步到可见 `.tiles/` 目录，因此两处会有一份有意保留的重复 tile 数据
+
 当 `--tile-only` 与 `--output-conflict` 组合时：
 
 - `skip`：如果现有 `.tiles` 目录已经是同一作品的完整 tile 集，会直接记为 skipped

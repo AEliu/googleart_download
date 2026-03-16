@@ -143,6 +143,12 @@ Each tile-only directory contains:
 - `tiles/*.tile`
 - `state.json`
 
+Tile-only also uses a hidden stable cache under `.googleart-cache/`, keyed by artwork identity rather than the visible directory name. This means:
+
+- the visible `.tiles/` directory is the user-facing result
+- the hidden cache is what protects cache identity and resume correctness
+- successful tile-only runs intentionally duplicate tile data into the visible `.tiles/` directory while keeping the hidden cache available for later reuse
+
 ## Output Conflict Policies
 
 ```bash
