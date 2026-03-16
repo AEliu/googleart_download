@@ -117,6 +117,11 @@ Repo quality and automation:
   - request counts by artwork
   - retry totals by artwork
   - basic phase timing breakdown for fetch / download / stitch / write
+- prepare the HTTP layer for an async tile-download path without forcing a full async rewrite:
+  - extract shared transport/retry/proxy configuration so sync and async clients can reuse it
+  - keep async work focused on tile downloading first, not stitching or persistence
+  - preserve current batch state, cache, and reporter semantics while adding an async download path
+  - decide on any user-facing engine switch only after the async tile path is stable
 - unify metadata output options into a clearer mode-based CLI design
 - enrich sidecar JSON with more operational metadata
 - add an opt-in richer metadata export path without breaking the current `--write-sidecar` behavior:
