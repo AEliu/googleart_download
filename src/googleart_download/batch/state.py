@@ -38,6 +38,7 @@ def _serialize_result(result: DownloadResult) -> JsonObject:
         "output_path": str(result.output_path),
         "title": result.title,
         "skipped": result.skipped,
+        "tile_only": result.tile_only,
     }
     if result.size is not None:
         payload["size"] = [result.size[0], result.size[1]]
@@ -82,6 +83,7 @@ def _parse_result(raw: object) -> DownloadResult | None:
     tile_count = raw.get("tile_count")
     sidecar_path = raw.get("sidecar_path")
     skipped = raw.get("skipped", False)
+    tile_only = raw.get("tile_only", False)
     backend_used = raw.get("backend_used")
     parsed_backend: StitchBackend | None = None
     if isinstance(backend_used, str):
@@ -97,6 +99,7 @@ def _parse_result(raw: object) -> DownloadResult | None:
         size=size,
         tile_count=tile_count if isinstance(tile_count, int) else None,
         skipped=bool(skipped),
+        tile_only=bool(tile_only),
         sidecar_path=Path(sidecar_path) if isinstance(sidecar_path, str) else None,
         backend_used=parsed_backend,
     )

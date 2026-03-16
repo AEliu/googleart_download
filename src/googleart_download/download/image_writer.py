@@ -73,6 +73,13 @@ def resolve_output_path(
     return output_dir / f"{sanitize_filename(title)}{suffix}.jpg"
 
 
+def resolve_tile_output_path(output_path: Path) -> Path:
+    suffix = output_path.suffix
+    if suffix:
+        return output_path.with_suffix(".tiles")
+    return output_path.with_name(f"{output_path.name}.tiles")
+
+
 def resolve_non_conflicting_output_path(output_path: Path) -> Path:
     if not output_path.exists():
         return output_path

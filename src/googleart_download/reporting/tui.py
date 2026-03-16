@@ -191,11 +191,14 @@ class RichTuiReporter(Reporter):
         self.log_line("All tiles downloaded, stitching image")
 
     def artwork_finished(self, result: DownloadResult) -> None:
-        self.current_status = "Saved"
+        self.current_status = "Tiles saved" if result.tile_only else "Saved"
         self.current_phase = "done"
         if self.stitching_in_progress:
             self.progress.update(self.tile_task_id, description="Stitching", completed=1, total=1)
-        self.log_line(f"Saved: {result.output_path}")
+        if result.tile_only:
+            self.log_line(f"Tiles saved: {result.output_path}")
+        else:
+            self.log_line(f"Saved: {result.output_path}")
         if result.sidecar_path is not None:
             self.log_line(f"Sidecar: {result.sidecar_path}")
         self.live.update(self.render())

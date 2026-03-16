@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import shutil
 from pathlib import Path
 
 from ..logging_utils import get_logger
@@ -19,7 +20,14 @@ from ..models import (
     TileJob,
 )
 from ..reporting import Reporter
-from .cache import clear_cache_dir, ensure_cache_layout, resolve_artwork_cache_dir, tile_cache_path, write_cache_state
+from .cache import (
+    cache_matches_asset,
+    clear_cache_dir,
+    ensure_cache_layout,
+    resolve_artwork_cache_dir,
+    tile_cache_path,
+    write_cache_state,
+)
 from .http_client import AsyncHttpClient, HttpClient
 from .image_writer import (
     choose_stitch_backend,
@@ -27,6 +35,7 @@ from .image_writer import (
     resolve_backend_output_path,
     resolve_non_conflicting_output_path,
     resolve_output_path,
+    resolve_tile_output_path,
     stitch_tiles,
 )
 from .size_selection import list_size_options, select_download_level
@@ -75,6 +84,7 @@ def download_artwork(
     index: int,
     total: int,
     proxy_url: str | None = None,
+    tile_only: bool = False,
 ) -> DownloadResult:
     logger = get_logger()
     with HttpClient(
@@ -106,13 +116,17 @@ def download_artwork(
         )
         selected_backend = choose_stitch_backend(selected_tile_info, stitch_backend)
         output_path = resolve_backend_output_path(original_output_path, selected_backend)
+        if tile_only:
+            output_path = resolve_tile_output_path(original_output_path)
         if output_conflict_policy is OutputConflictPolicy.RENAME and output_path.exists():
             renamed_output_path = resolve_non_conflicting_output_path(output_path)
             reporter.log(f"Output already exists, renaming to: {renamed_output_path}")
             output_path = renamed_output_path
-        removed_partials = cleanup_stale_partial_outputs(original_output_path, output_path, selected_backend)
+        removed_partials = (
+            [] if tile_only else cleanup_stale_partial_outputs(original_output_path, output_path, selected_backend)
+        )
 
-        if output_conflict_policy is OutputConflictPolicy.SKIP and output_path.exists():
+        if not tile_only and output_conflict_policy is OutputConflictPolicy.SKIP and output_path.exists():
             sidecar_path = output_path.with_suffix(output_path.suffix + ".json") if write_sidecar else None
             return DownloadResult(
                 url=canonical_asset_url,
@@ -126,8 +140,18 @@ def download_artwork(
             )
         if output_conflict_policy is OutputConflictPolicy.OVERWRITE and output_path.exists():
             reporter.log(f"Overwriting existing output: {output_path}")
+            if output_path.is_dir():
+                shutil.rmtree(output_path)
+            else:
+                output_path.unlink()
 
-        cache_dir = resolve_artwork_cache_dir(output_dir, canonical_asset_url, output_path)
+        if tile_only and output_path.exists() and not cache_matches_asset(output_path, canonical_asset_url):
+            reporter.log(f"Tile directory belongs to a different artwork, clearing stale tiles: {output_path}")
+            clear_cache_dir(output_path)
+
+        cache_dir = (
+            output_path if tile_only else resolve_artwork_cache_dir(output_dir, canonical_asset_url, output_path)
+        )
         tiles_dir = ensure_cache_layout(cache_dir)
 
         context = ArtworkContext(
@@ -160,13 +184,16 @@ def download_artwork(
             f"{tile_info.image_width_for(selected_level)}x{tile_info.image_height_for(selected_level)} | "
             f"{len(jobs)} tiles | level {selected_level.z}"
         )
-        reporter.log(f"Output format: {output_path.suffix.lower().lstrip('.').upper()}")
+        reporter.log(
+            "Output format: TILES" if tile_only else f"Output format: {output_path.suffix.lower().lstrip('.').upper()}"
+        )
         if selected_backend is StitchBackend.BIGTIFF:
             reporter.log(f"Large artwork output adjusted to TIFF for streaming stitch safety: {output_path}")
         for stale_partial in removed_partials:
             reporter.log(f"Removed stale partial output from older JPEG attempt: {stale_partial}")
         write_cache_state(
             cache_dir,
+            asset_url=canonical_asset_url,
             page=page,
             tile_info=selected_tile_info,
             output_path=output_path,
@@ -185,13 +212,34 @@ def download_artwork(
         )
         write_cache_state(
             cache_dir,
+            asset_url=canonical_asset_url,
             page=page,
             tile_info=selected_tile_info,
             output_path=output_path,
             completed_tiles=len(tiles),
             total_tiles=len(jobs),
-            stage="stitching",
+            stage="downloaded" if tile_only else "stitching",
         )
+        if tile_only:
+            if output_conflict_policy is OutputConflictPolicy.SKIP and output_path.exists() and len(tiles) == len(jobs):
+                return DownloadResult(
+                    url=canonical_asset_url,
+                    output_path=output_path,
+                    title=page.title,
+                    size=(tile_info.image_width_for(selected_level), tile_info.image_height_for(selected_level)),
+                    tile_count=len(jobs),
+                    skipped=False,
+                    tile_only=True,
+                )
+            reporter.log(f"Tiles saved: {output_path}")
+            return DownloadResult(
+                url=canonical_asset_url,
+                output_path=output_path,
+                title=page.title,
+                size=(tile_info.image_width_for(selected_level), tile_info.image_height_for(selected_level)),
+                tile_count=len(jobs),
+                tile_only=True,
+            )
         reporter.log(f"Stitch backend selected: {selected_backend.value}")
         reporter.stitching_started()
         selected_backend = stitch_tiles(

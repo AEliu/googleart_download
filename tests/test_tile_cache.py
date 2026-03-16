@@ -20,6 +20,7 @@ from googleart_download.download.image_writer import (
     resolve_backend_output_path,
     resolve_non_conflicting_output_path,
     resolve_output_path,
+    resolve_tile_output_path,
 )
 from googleart_download.download.size_selection import list_size_options, select_download_level
 from googleart_download.download.tiles import download_tiles, download_tiles_async
@@ -228,6 +229,10 @@ class TileCacheTests(unittest.TestCase):
             max_dimension=8000,
         )
         self.assertEqual(path.name, "The Starry Night.maxdim-8000.jpg")
+
+    def test_resolve_tile_output_path_uses_tiles_directory_suffix(self) -> None:
+        path = resolve_tile_output_path(Path("/tmp/The Starry Night.medium.jpg"))
+        self.assertEqual(path.name, "The Starry Night.medium.tiles")
 
     def test_build_temp_output_path_preserves_image_extension(self) -> None:
         path = build_temp_output_path(Path("/tmp/The Starry Night.preview.jpg"))

@@ -37,6 +37,7 @@ class BatchDownloadManager:
         output_conflict_policy: OutputConflictPolicy,
         write_metadata: bool,
         write_sidecar: bool,
+        tile_only: bool = False,
         stitch_backend: StitchBackend = StitchBackend.AUTO,
         rerun_failures: int = 0,
         resume_batch: bool = False,
@@ -56,6 +57,7 @@ class BatchDownloadManager:
         self.output_conflict_policy = output_conflict_policy
         self.write_metadata = write_metadata
         self.write_sidecar = write_sidecar
+        self.tile_only = tile_only
         self.stitch_backend = stitch_backend
         self.rerun_failures = rerun_failures
         self.resume_batch = resume_batch
@@ -112,6 +114,7 @@ class BatchDownloadManager:
                         output_conflict_policy=self.output_conflict_policy,
                         write_metadata=self.write_metadata,
                         write_sidecar=self.write_sidecar,
+                        tile_only=self.tile_only,
                         stitch_backend=self.stitch_backend,
                         reporter=self.reporter,
                         index=task.index,
