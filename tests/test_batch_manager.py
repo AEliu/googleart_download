@@ -7,6 +7,7 @@ from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from googleart_download.batch import BatchDownloadManager
+from googleart_download.batch_state import BatchStateStore
 from googleart_download.errors import DownloadError
 from googleart_download.models import DownloadResult, DownloadSize, OutputConflictPolicy, RetryConfig, TaskState
 from googleart_download.reporters import Reporter
@@ -17,6 +18,46 @@ class SilentReporter(Reporter):
 
 
 class BatchManagerTests(unittest.TestCase):
+    def test_batch_state_store_load_failed_urls(self) -> None:
+        with TemporaryDirectory() as tmpdir:
+            state_path = Path(tmpdir) / ".googleart-batch-state.json"
+            state_path.write_text(
+                json.dumps(
+                    {
+                        "version": 1,
+                        "created_at": "2026-01-01T00:00:00+00:00",
+                        "updated_at": "2026-01-01T00:00:01+00:00",
+                        "urls": [
+                            "https://artsandculture.google.com/asset/example/one",
+                            "https://artsandculture.google.com/asset/example/two",
+                        ],
+                        "tasks": [
+                            {
+                                "index": 1,
+                                "url": "https://artsandculture.google.com/asset/example/one",
+                                "state": "failed",
+                                "attempts": 1,
+                                "error": "boom",
+                            },
+                            {
+                                "index": 2,
+                                "url": "https://artsandculture.google.com/asset/example/two",
+                                "state": "succeeded",
+                                "attempts": 1,
+                            },
+                        ],
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            failed_urls = BatchStateStore(state_path).load_failed_urls()
+
+        self.assertEqual(failed_urls, ["https://artsandculture.google.com/asset/example/one"])
+
     def test_persists_batch_state_file(self) -> None:
         first_url = "https://artsandculture.google.com/asset/example/one"
         second_url = "https://artsandculture.google.com/asset/example/two"

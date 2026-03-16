@@ -14,6 +14,7 @@ The project currently supports:
 - request-level retries with backoff
 - batch-level failed task reruns via `--rerun-failures`
 - batch state persistence and explicit resume via `--resume-batch`
+- targeted rerun support via `--rerun-failed`
 - user-friendly size selection via `--size` and `--max-dimension`
 - size inspection via `--list-sizes`
 - size inspection now includes raw canvas memory estimates and auto output-format hints

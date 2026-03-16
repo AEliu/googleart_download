@@ -10,6 +10,7 @@ from rich.console import Console
 from rich.table import Table
 
 from .batch import BatchDownloadManager
+from .batch_state import BatchStateStore, resolve_batch_state_path, resolve_failed_rerun_state_path
 from .download.http_client import HttpClient
 from .download.downloader import inspect_artwork_metadata, inspect_artwork_sizes
 from .download.image_writer import resolve_output_path
@@ -80,6 +81,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "--resume-batch",
         action="store_true",
         help="resume batch task state from the state file instead of starting a fresh batch",
+    )
+    parser.add_argument(
+        "--rerun-failed",
+        action="store_true",
+        help="start a new batch using only the failed tasks recorded in the batch state file",
     )
     parser.add_argument(
         "--batch-state-file",
@@ -155,7 +161,7 @@ def collect_urls(args: argparse.Namespace) -> list[str]:
         ]
         urls.extend(file_urls)
 
-    if not urls:
+    if not urls and not args.rerun_failed:
         raise DownloadError("provide at least one URL or use --url-file")
 
     if args.retries < 1:
@@ -174,6 +180,9 @@ def collect_urls(args: argparse.Namespace) -> list[str]:
 
 
 def validate_cli_args(args: argparse.Namespace, urls: list[str]) -> None:
+    if args.resume_batch and args.rerun_failed:
+        raise DownloadError("--resume-batch cannot be used together with --rerun-failed")
+
     if args.resume_batch and args.metadata_only:
         raise DownloadError("--resume-batch cannot be used together with --metadata-only")
 
@@ -185,6 +194,15 @@ def validate_cli_args(args: argparse.Namespace, urls: list[str]) -> None:
 
     if args.batch_state_file and args.list_sizes:
         raise DownloadError("--batch-state-file cannot be used together with --list-sizes")
+
+    if args.rerun_failed and args.metadata_only:
+        raise DownloadError("--rerun-failed cannot be used together with --metadata-only")
+
+    if args.rerun_failed and args.list_sizes:
+        raise DownloadError("--rerun-failed cannot be used together with --list-sizes")
+
+    if args.rerun_failed and urls:
+        raise DownloadError("--rerun-failed loads failed URLs from the batch state file and cannot be combined with direct batch URLs")
 
     if args.metadata_only and args.filename and len(urls) > 1:
         raise DownloadError("--filename cannot be used with multiple URLs in --metadata-only mode")
@@ -242,6 +260,13 @@ def canonicalize_batch_urls(urls: list[str], retry_config: RetryConfig) -> tuple
             seen_by_url.add(canonical_url)
 
     return unique_urls, duplicate_messages
+
+
+def load_failed_batch_urls(output_dir: Path, batch_state_file: str | None) -> tuple[list[str], Path, Path]:
+    source_state_path = resolve_batch_state_path(output_dir, batch_state_file)
+    failed_urls = BatchStateStore(source_state_path).load_failed_urls()
+    rerun_state_path = resolve_failed_rerun_state_path(output_dir, batch_state_file)
+    return failed_urls, source_state_path, rerun_state_path
 
 
 def render_size_options(title: str, options: list[SizeOption]) -> None:
@@ -376,12 +401,22 @@ def main(argv: Sequence[str] | None = None) -> int:
             attempts=args.retries,
             backoff_base_seconds=args.retry_backoff,
         )
+        batch_state_file = args.batch_state_file
         if args.list_sizes:
             title, options = inspect_artwork_sizes(urls[0], retry_config)
             render_size_options(title, options)
             return 0
         if args.metadata_only:
             return run_metadata_only(args, urls, retry_config)
+        if args.rerun_failed:
+            failed_urls, source_state_path, rerun_state_path = load_failed_batch_urls(Path(args.output_dir), args.batch_state_file)
+            if not failed_urls:
+                reporter.log(f"No failed tasks found in batch state file: {source_state_path}")
+                return 0
+            reporter.log(f"Loaded {len(failed_urls)} failed artwork(s) from {source_state_path}")
+            reporter.log(f"Targeted rerun state file: {rerun_state_path}")
+            urls = failed_urls
+            batch_state_file = str(rerun_state_path)
         canonical_urls = urls
         if len(urls) > 1:
             canonical_urls, duplicate_messages = canonicalize_batch_urls(urls, retry_config)
@@ -407,7 +442,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             stitch_backend=StitchBackend(args.stitch_backend),
             rerun_failures=args.rerun_failures,
             resume_batch=args.resume_batch,
-            batch_state_file=args.batch_state_file,
+            batch_state_file=batch_state_file,
         )
         run_result = manager.run()
     except DownloadError as exc:

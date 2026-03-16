@@ -107,6 +107,12 @@ uv run googleart-download --url-file urls.txt --rerun-failures 1
 uv run googleart-download --url-file urls.txt --resume-batch
 ```
 
+只重跑上次批次里失败的任务：
+
+```bash
+uv run googleart-download --rerun-failed
+```
+
 自定义批次状态文件位置：
 
 ```bash
@@ -258,8 +264,11 @@ uv run googleart-download "https://artsandculture.google.com/asset/..." --log-fi
 - 单张作品成功写出后，会默认清理对应的 tile 缓存；失败时缓存会保留，便于恢复。
 - 批量下载还会把任务状态写到输出目录下的 `.googleart-batch-state.json`。这和 tile 缓存是两层恢复能力：tile 缓存负责单作品内的瓦片复用，batch state 负责整批 URL 的任务状态恢复。
 - `--resume-batch` 会从 batch state 文件恢复任务状态：已成功/已跳过任务默认不再重跑，失败和待处理任务继续执行；上次中断时停在 `running` 的任务会回退成 `pending` 再执行。
+- `--rerun-failed` 会直接从 batch state 文件里提取上次失败的任务，启动一个新的小批次；它不需要你重新提供整批 URL。
+- `--rerun-failed` 默认会把新的运行状态写到单独的 rerun state 文件，避免覆盖原始 batch state。
 - `--batch-state-file` 可以指定自定义状态文件路径；如果不传，默认使用 `<output-dir>/.googleart-batch-state.json`。
-- `--resume-batch` 和 `--list-sizes`、`--metadata-only` 不能一起使用；`--batch-state-file` 也只对真正的下载批次有意义。
+- `--resume-batch` 和 `--rerun-failed` 不能一起使用；这两个参数也都不能和 `--list-sizes`、`--metadata-only` 一起使用。
+- `--rerun-failed` 会从 state 文件读取失败任务，因此不能再同时传入直接的 batch URL 或 `--url-file`。
 - 最终图片会先写到保留原扩展名的临时文件，再原子替换成目标文件，避免半成品污染正式输出。
 - `--size` 是用户友好的语义化尺寸预设；`--max-dimension` 则允许你直接控制最长边上限。
 - 默认仍然是 `--size max`，也就是下载当前可用的最大尺寸。

@@ -10,6 +10,7 @@ from .metadata.parsers import normalize_asset_url
 from .models import BatchStateLoadResult, BatchTask, DownloadResult, JsonObject, TaskState
 
 DEFAULT_BATCH_STATE_FILENAME = ".googleart-batch-state.json"
+FAILED_RERUN_BATCH_STATE_FILENAME = ".googleart-batch-rerun-state.json"
 STATE_VERSION = 1
 
 
@@ -17,6 +18,13 @@ def resolve_batch_state_path(output_dir: Path, batch_state_file: str | None) -> 
     if batch_state_file is not None:
         return Path(batch_state_file)
     return output_dir / DEFAULT_BATCH_STATE_FILENAME
+
+
+def resolve_failed_rerun_state_path(output_dir: Path, batch_state_file: str | None) -> Path:
+    if batch_state_file is not None:
+        source_path = Path(batch_state_file)
+        return source_path.with_name(f"{source_path.stem}.rerun{source_path.suffix}")
+    return output_dir / FAILED_RERUN_BATCH_STATE_FILENAME
 
 
 def _utc_now() -> str:
@@ -146,6 +154,35 @@ class BatchStateStore:
         temp_path.replace(self.path)
 
     def load(self, *, urls: list[str]) -> BatchStateLoadResult:
+        payload, raw_urls, raw_tasks = self._load_payload()
+
+        normalized_urls = [normalize_asset_url(url) for url in urls]
+        if normalized_urls != raw_urls:
+            raise DownloadError("batch state file URLs do not match the current batch input")
+
+        tasks = [_parse_task(task) for task in raw_tasks]
+        if len(tasks) != len(urls):
+            raise DownloadError("batch state file task count does not match the current batch input")
+
+        reset_running = False
+        normalized_tasks: list[BatchTask] = []
+        for index, (task, expected_url) in enumerate(zip(tasks, normalized_urls, strict=True), start=1):
+            if normalize_asset_url(task.url) != expected_url:
+                raise DownloadError("batch state file task URLs do not match the current batch input")
+            normalized_task = replace(task, index=index, url=expected_url)
+            if normalized_task.state == TaskState.RUNNING:
+                normalized_task = replace(normalized_task, state=TaskState.PENDING)
+                reset_running = True
+            normalized_tasks.append(normalized_task)
+
+        return BatchStateLoadResult(tasks=normalized_tasks, reset_running_tasks=reset_running)
+
+    def load_failed_urls(self) -> list[str]:
+        _, _, raw_tasks = self._load_payload()
+        tasks = [_parse_task(task) for task in raw_tasks]
+        return [normalize_asset_url(task.url) for task in tasks if task.state == TaskState.FAILED]
+
+    def _load_payload(self) -> tuple[dict[str, object], list[str], list[object]]:
         if not self.path.exists():
             raise DownloadError(f"batch state file does not exist: {self.path}")
 
@@ -170,23 +207,4 @@ class BatchStateStore:
         if not isinstance(raw_tasks, list):
             raise DownloadError("batch state file is invalid: tasks must be a list")
 
-        normalized_urls = [normalize_asset_url(url) for url in urls]
-        if normalized_urls != raw_urls:
-            raise DownloadError("batch state file URLs do not match the current batch input")
-
-        tasks = [_parse_task(task) for task in raw_tasks]
-        if len(tasks) != len(urls):
-            raise DownloadError("batch state file task count does not match the current batch input")
-
-        reset_running = False
-        normalized_tasks: list[BatchTask] = []
-        for index, (task, expected_url) in enumerate(zip(tasks, normalized_urls, strict=True), start=1):
-            if normalize_asset_url(task.url) != expected_url:
-                raise DownloadError("batch state file task URLs do not match the current batch input")
-            normalized_task = replace(task, index=index, url=expected_url)
-            if normalized_task.state == TaskState.RUNNING:
-                normalized_task = replace(normalized_task, state=TaskState.PENDING)
-                reset_running = True
-            normalized_tasks.append(normalized_task)
-
-        return BatchStateLoadResult(tasks=normalized_tasks, reset_running_tasks=reset_running)
+        return payload, raw_urls, raw_tasks

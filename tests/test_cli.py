@@ -67,6 +67,18 @@ class CliTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("--resume-batch cannot be used together with --metadata-only", stderr.getvalue())
 
+    def test_resume_batch_conflicts_with_rerun_failed(self) -> None:
+        stderr = io.StringIO()
+        with redirect_stderr(stderr), patch("googleart_download.cli.build_reporter", return_value=DummyReporter()):
+            code = cli.main(
+                [
+                    "--resume-batch",
+                    "--rerun-failed",
+                ]
+            )
+        self.assertEqual(code, 1)
+        self.assertIn("--resume-batch cannot be used together with --rerun-failed", stderr.getvalue())
+
     def test_batch_state_file_conflicts_with_list_sizes(self) -> None:
         stderr = io.StringIO()
         with redirect_stderr(stderr), patch("googleart_download.cli.build_reporter", return_value=DummyReporter()):
@@ -121,6 +133,19 @@ class CliTests(unittest.TestCase):
             )
         self.assertEqual(code, 1)
         self.assertIn("--metadata-only cannot be used together with --list-sizes", stderr.getvalue())
+
+    def test_rerun_failed_rejects_direct_urls(self) -> None:
+        stderr = io.StringIO()
+        with redirect_stderr(stderr), patch("googleart_download.cli.build_reporter", return_value=DummyReporter()):
+            code = cli.main(
+                [
+                    "https://artsandculture.google.com/asset/example/id",
+                    "--rerun-failed",
+                ]
+            )
+        self.assertEqual(code, 1)
+        self.assertIn("--rerun-failed loads failed URLs from the batch state file", stderr.getvalue())
+        self.assertIn("combined with direct batch URLs", stderr.getvalue())
 
     def test_single_url_metadata_only_writes_default_file(self) -> None:
         with TemporaryDirectory() as tmpdir:
@@ -255,6 +280,59 @@ class CliTests(unittest.TestCase):
         self.assertEqual(code, 0)
         reporter.log.assert_any_call("Duplicate artwork input skipped: duplicate")
         reporter.log.assert_any_call("Batch input normalized from 2 URL(s) to 1 unique artwork(s)")
+
+    def test_rerun_failed_loads_failed_urls_into_new_batch(self) -> None:
+        reporter = MagicMock()
+        fake_manager = MagicMock()
+        fake_manager.run.return_value = BatchRunResult(snapshot=BatchSnapshot(tasks=[]), succeeded=[], failed=[])
+
+        with patch("googleart_download.cli.build_reporter", return_value=reporter):
+            with patch(
+                "googleart_download.cli.load_failed_batch_urls",
+                return_value=(
+                    [
+                        "https://artsandculture.google.com/asset/example/failed-one",
+                        "https://artsandculture.google.com/asset/example/failed-two",
+                    ],
+                    Path("downloads/.googleart-batch-state.json"),
+                    Path("downloads/.googleart-batch-rerun-state.json"),
+                ),
+            ):
+                with patch("googleart_download.cli.BatchDownloadManager", return_value=fake_manager) as manager_cls:
+                    with patch("googleart_download.cli.render_summary"):
+                        code = cli.main(["--rerun-failed"])
+
+        self.assertEqual(code, 0)
+        manager_cls.assert_called_once()
+        kwargs = manager_cls.call_args.kwargs
+        self.assertEqual(
+            kwargs["urls"],
+            [
+                "https://artsandculture.google.com/asset/example/failed-one",
+                "https://artsandculture.google.com/asset/example/failed-two",
+            ],
+        )
+        self.assertEqual(kwargs["batch_state_file"], "downloads/.googleart-batch-rerun-state.json")
+        reporter.log.assert_any_call("Loaded 2 failed artwork(s) from downloads/.googleart-batch-state.json")
+
+    def test_rerun_failed_exits_cleanly_when_no_failed_tasks_exist(self) -> None:
+        reporter = MagicMock()
+
+        with patch("googleart_download.cli.build_reporter", return_value=reporter):
+            with patch(
+                "googleart_download.cli.load_failed_batch_urls",
+                return_value=(
+                    [],
+                    Path("downloads/.googleart-batch-state.json"),
+                    Path("downloads/.googleart-batch-rerun-state.json"),
+                ),
+            ):
+                with patch("googleart_download.cli.BatchDownloadManager") as manager_cls:
+                    code = cli.main(["--rerun-failed"])
+
+        self.assertEqual(code, 0)
+        manager_cls.assert_not_called()
+        reporter.log.assert_any_call("No failed tasks found in batch state file: downloads/.googleart-batch-state.json")
 
 
 if __name__ == "__main__":
