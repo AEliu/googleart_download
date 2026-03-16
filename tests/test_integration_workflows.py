@@ -11,6 +11,7 @@ from unittest.mock import patch
 from PIL import Image
 
 from googleart_download import cli
+from googleart_download.download.cache import resolve_artwork_cache_dir
 from googleart_download.download.downloader import download_artwork
 from googleart_download.models import (
     ArtworkMetadata,
@@ -186,12 +187,18 @@ class CliIntegrationWorkflowTests(unittest.TestCase):
         with TemporaryDirectory() as tmpdir:
             output_dir = Path(tmpdir)
             visible_tiles_dir = output_dir / "The Great Wave.tiles"
-            tile_path = visible_tiles_dir / "tiles" / "0-0-0.tile"
+            hidden_cache_dir = resolve_artwork_cache_dir(
+                output_dir,
+                page.asset_url,
+                output_dir / "The Great Wave.jpg",
+            )
+            hidden_tile_path = hidden_cache_dir / "tiles" / "0-0-0.tile"
 
             def fake_await_download_tiles(*args, **kwargs):  # type: ignore[no-untyped-def]
-                tile_path.parent.mkdir(parents=True, exist_ok=True)
-                tile_path.write_bytes(b"tile")
-                return {(0, 0): tile_path}
+                self.assertEqual(kwargs["tiles_dir"], hidden_cache_dir / "tiles")
+                hidden_tile_path.parent.mkdir(parents=True, exist_ok=True)
+                hidden_tile_path.write_bytes(b"tile")
+                return {(0, 0): hidden_tile_path}
 
             with patch("googleart_download.download.downloader.HttpClient") as client_cls:
                 client = client_cls.return_value.__enter__.return_value
@@ -228,10 +235,12 @@ class CliIntegrationWorkflowTests(unittest.TestCase):
             stitch_mock.assert_not_called()
             self.assertTrue(result.tile_only)
             self.assertEqual(result.output_path, visible_tiles_dir)
+            self.assertNotEqual(hidden_cache_dir, visible_tiles_dir)
+            self.assertTrue((hidden_cache_dir / "tiles" / "0-0-0.tile").exists())
             self.assertTrue((visible_tiles_dir / "tiles" / "0-0-0.tile").exists())
             self.assertTrue((visible_tiles_dir / "state.json").exists())
 
-    def test_download_artwork_tile_only_clears_mismatched_existing_tile_directory(self) -> None:
+    def test_download_artwork_tile_only_skip_preserves_mismatched_existing_tile_directory(self) -> None:
         page = PageInfo(
             title="The Great Wave",
             base_url="https://lh3.googleusercontent.com/example",
@@ -257,12 +266,14 @@ class CliIntegrationWorkflowTests(unittest.TestCase):
                 json.dumps({"asset_url": "https://artsandculture.google.com/asset/example/other"}),
                 encoding="utf-8",
             )
+            hidden_cache_dir = resolve_artwork_cache_dir(
+                output_dir,
+                page.asset_url,
+                output_dir / "The Great Wave.jpg",
+            )
 
             def fake_await_download_tiles(*args, **kwargs):  # type: ignore[no-untyped-def]
-                self.assertFalse(stale_tile_path.exists())
-                stale_tile_path.parent.mkdir(parents=True, exist_ok=True)
-                stale_tile_path.write_bytes(b"fresh-tile")
-                return {(0, 0): stale_tile_path}
+                raise AssertionError("tile download should not start for skipped mismatched tile-only output")
 
             with patch("googleart_download.download.downloader.HttpClient") as client_cls:
                 client = client_cls.return_value.__enter__.return_value
@@ -297,10 +308,94 @@ class CliIntegrationWorkflowTests(unittest.TestCase):
 
             self.assertEqual(result.output_path, visible_tiles_dir)
             self.assertTrue(result.tile_only)
-            self.assertFalse(result.skipped)
-            self.assertEqual(stale_tile_path.read_bytes(), b"fresh-tile")
+            self.assertTrue(result.skipped)
+            self.assertEqual(stale_tile_path.read_bytes(), b"stale-tile")
+            self.assertTrue(hidden_cache_dir.exists())
+            self.assertFalse((hidden_cache_dir / "state.json").exists())
+            self.assertFalse((hidden_cache_dir / "tiles" / "0-0-0.tile").exists())
             state_payload = json.loads((visible_tiles_dir / "state.json").read_text(encoding="utf-8"))
-            self.assertEqual(state_payload["asset_url"], page.asset_url)
+            self.assertEqual(state_payload["asset_url"], "https://artsandculture.google.com/asset/example/other")
+
+    def test_download_artwork_tile_only_rename_reuses_hidden_cache_seeded_from_existing_visible_output(self) -> None:
+        page = PageInfo(
+            title="The Great Wave",
+            base_url="https://lh3.googleusercontent.com/example",
+            token="token",
+            asset_url="https://artsandculture.google.com/asset/example/id",
+            metadata=None,
+        )
+        tile_info = TileInfo(
+            tile_width=8,
+            tile_height=8,
+            levels=[PyramidLevel(z=0, num_tiles_x=1, num_tiles_y=1, empty_pels_x=0, empty_pels_y=0)],
+        )
+        jobs = [TileJob(z=0, x=0, y=0, url="https://example.com/tile")]
+        assert page.asset_url is not None
+
+        with TemporaryDirectory() as tmpdir:
+            output_dir = Path(tmpdir)
+            visible_tiles_dir = output_dir / "The Great Wave.tiles"
+            original_tile_path = visible_tiles_dir / "tiles" / "0-0-0.tile"
+            original_tile_path.parent.mkdir(parents=True, exist_ok=True)
+            original_tile_path.write_bytes(b"ready-tile")
+            (visible_tiles_dir / "state.json").write_text(
+                json.dumps(
+                    {
+                        "asset_url": page.asset_url,
+                        "completed_tiles": 1,
+                        "total_tiles": 1,
+                        "stage": "downloaded",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            hidden_cache_dir = resolve_artwork_cache_dir(
+                output_dir,
+                page.asset_url,
+                output_dir / "The Great Wave.jpg",
+            )
+
+            def fake_await_download_tiles(*args, **kwargs):  # type: ignore[no-untyped-def]
+                self.assertEqual(kwargs["tiles_dir"], hidden_cache_dir / "tiles")
+                self.assertTrue((hidden_cache_dir / "tiles" / "0-0-0.tile").exists())
+                return {(0, 0): hidden_cache_dir / "tiles" / "0-0-0.tile"}
+
+            with patch("googleart_download.download.downloader.HttpClient") as client_cls:
+                client = client_cls.return_value.__enter__.return_value
+                client.fetch_text_with_url.return_value = ("<html></html>", page.asset_url)
+                client.fetch_bytes.return_value = b"tile-metadata"
+
+                with patch("googleart_download.download.downloader.parse_page_info", return_value=page):
+                    with patch("googleart_download.download.downloader.parse_tile_info", return_value=tile_info):
+                        with patch("googleart_download.download.downloader.build_jobs", return_value=jobs):
+                            with patch(
+                                "googleart_download.download.downloader.await_download_tiles",
+                                side_effect=fake_await_download_tiles,
+                            ):
+                                result = download_artwork(
+                                    url=page.asset_url,
+                                    output_dir=output_dir,
+                                    filename=None,
+                                    workers=1,
+                                    jpeg_quality=85,
+                                    retry_config=RetryConfig(attempts=1),
+                                    download_size=DownloadSize.MAX,
+                                    max_dimension=None,
+                                    output_conflict_policy=OutputConflictPolicy.RENAME,
+                                    write_metadata=False,
+                                    write_sidecar=False,
+                                    tile_only=True,
+                                    stitch_backend=StitchBackend.AUTO,
+                                    reporter=SilentReporter(),
+                                    index=1,
+                                    total=1,
+                                )
+
+            renamed_tiles_dir = output_dir / "The Great Wave.2.tiles"
+            self.assertEqual(result.output_path, renamed_tiles_dir)
+            self.assertNotEqual(hidden_cache_dir, renamed_tiles_dir)
+            self.assertEqual((renamed_tiles_dir / "tiles" / "0-0-0.tile").read_bytes(), b"ready-tile")
+            self.assertEqual(original_tile_path.read_bytes(), b"ready-tile")
 
     def test_download_artwork_tile_only_skip_returns_skipped_for_complete_existing_tiles(self) -> None:
         page = PageInfo(
