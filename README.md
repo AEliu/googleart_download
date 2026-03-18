@@ -1,14 +1,14 @@
 # ArtX
 
 [![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-3776AB.svg)](#install)
-[![Version 0.4.0](https://img.shields.io/badge/version-0.3.0-0f766e.svg)](pyproject.toml)
+[![Version 0.4.0](https://img.shields.io/badge/version-0.4.0-0f766e.svg)](pyproject.toml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-0f766e.svg)](LICENSE)
 
 [中文说明](docs/README.zh-CN.md)
 
 Download high-resolution images from Google Arts & Culture artwork pages.
 
-`googleart-download` resolves the artwork page, downloads the tiled image pyramid, and stitches the final image locally. It is built for reliability first: batch runs, retry handling, tile-cache reuse, interrupted-run recovery, and safe handling for very large artworks.
+ArtX resolves the artwork page, downloads the tiled image pyramid, and stitches the final image locally. It is built for reliability first: batch runs, retry handling, tile-cache reuse, interrupted-run recovery, and safe handling for very large artworks.
 
 ## Highlights
 

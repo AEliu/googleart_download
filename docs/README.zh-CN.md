@@ -1,14 +1,14 @@
 # ArtX
 
 [![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-3776AB.svg)](#安装)
-[![Version 0.4.0](https://img.shields.io/badge/version-0.3.0-0f766e.svg)](../pyproject.toml)
+[![Version 0.4.0](https://img.shields.io/badge/version-0.4.0-0f766e.svg)](../pyproject.toml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-0f766e.svg)](../LICENSE)
 
 [English README](../README.md)
 
 下载 Google Arts & Culture 作品页中的高清图像。
 
-`googleart-download` 会解析 Google Arts & Culture 作品页，下载高清图像所需的瓦片，并在本地拼接成完整图片。这个项目优先关注下载可靠性和长期可用性：支持批量任务、请求重试、缓存复用、中断恢复，以及超大图的安全处理。
+ArtX 会解析 Google Arts & Culture 作品页，下载高清图像所需的瓦片，并在本地拼接成完整图片。这个项目优先关注下载可靠性和长期可用性：支持批量任务、请求重试、缓存复用、中断恢复，以及超大图的安全处理。
 
 ## 特性
 
