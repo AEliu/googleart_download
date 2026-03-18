@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document records the current architecture, major risks, and near-term design direction for `googleart-download`.
+This document records the current architecture, major risks, and near-term design direction for ArtX.
 
 Use this file for system design context.
 Do not use it as a replacement for `AGENTS.md`.

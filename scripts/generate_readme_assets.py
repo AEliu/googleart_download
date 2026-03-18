@@ -15,7 +15,7 @@ ASSETS_DIR = Path("docs/assets")
 def export_svg(output_path: Path, renderable: object, *, width: int = 160) -> None:
     console = Console(record=True, width=width, file=StringIO())
     console.print(renderable)
-    output_path.write_text(console.export_svg(title="googleart-download"), encoding="utf-8")
+    output_path.write_text(console.export_svg(title="ArtX"), encoding="utf-8")
 
 
 def export_reporter_svg(output_path: Path, configure: Callable[[RichTuiReporter], None]) -> None:

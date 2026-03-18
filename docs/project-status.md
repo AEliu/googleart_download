@@ -95,7 +95,7 @@ Repo quality and automation:
 - `uv run python -m mypy src tests scripts/generate_readme_assets.py`
 - `uv run python -m py_compile main.py src/googleart_download/*.py src/googleart_download/cli/*.py src/googleart_download/batch/*.py src/googleart_download/download/*.py src/googleart_download/metadata/*.py src/googleart_download/reporting/*.py scripts/generate_readme_assets.py tests/*.py`
 - `uv run python -m unittest discover -s tests -v`
-- `uv run googleart-download --help`
+- `uv run artx --help`
 
 ## Next TODO
 
