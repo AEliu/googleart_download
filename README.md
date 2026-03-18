@@ -118,7 +118,7 @@ Overlap batch download and stitching for adjacent artworks:
 uv run artx --url-file urls.txt --pipeline-artworks
 ```
 
-`--pipeline-artworks` is a batch-only throughput option. It keeps the current batch semantics, but while artwork N is stitching the downloader may already fetch tiles for artwork N+1. In the current implementation this overlap is fixed to one download phase plus one stitch phase, not full multi-artwork parallelism.
+`--pipeline-artworks` is a batch-only throughput option. It keeps the current batch semantics, but while artwork N is stitching the downloader may already fetch tiles for artwork N+1. In the current implementation this overlap is fixed to one download phase plus one stitch phase, not full multi-artwork parallelism. When combined with `--fail-fast` in pipeline mode, the batch stops launching new download phases after the first error but will finish any stitching that was already queued to avoid leaving partial work.
 
 Write metadata sidecars or EXIF:
 
