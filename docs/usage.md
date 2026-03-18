@@ -75,7 +75,7 @@ Overlap download and stitching across adjacent artworks:
 uv run artx --url-file urls.txt --pipeline-artworks
 ```
 
-`--pipeline-artworks` is a batch-only throughput option. While artwork N is stitching, artwork N+1 may already be downloading its tiles. In the current implementation this overlap is fixed to one download phase plus one stitch phase rather than general multi-artwork parallel execution.
+`--pipeline-artworks` is a batch-only throughput option. While artwork N is stitching, artwork N+1 may already be downloading its tiles. In the current implementation this overlap is fixed to one download phase plus one stitch phase rather than general multi-artwork parallel execution. With `--fail-fast` enabled in pipeline mode, new download phases stop after the first error; any already queued stitching will still complete to avoid leaving partial work.
 
 ## Retry And Parallelism
 
