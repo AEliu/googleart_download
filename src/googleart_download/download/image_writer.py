@@ -5,6 +5,7 @@ import re
 from pathlib import Path
 from types import ModuleType
 
+# cspell:words sysconf AVPHYS
 from PIL import Image
 
 from ..errors import DownloadError
