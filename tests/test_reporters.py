@@ -111,7 +111,8 @@ class ReporterTests(unittest.TestCase):
                 )
             )
             self.assertEqual(reporter.current_title, "Artwork")
-            self.assertEqual(reporter.current_output, "downloads/art.jpg")
+            # Normalize to POSIX style for assertion
+            self.assertEqual(Path(reporter.current_output).as_posix(), "downloads/art.jpg")
             self.assertEqual(reporter.current_phase, "skipped")
         finally:
             reporter.close()

@@ -1,6 +1,6 @@
 # Google art download
 
-[![Python 3.13+](https://img.shields.io/badge/python-3.13%2B-3776AB.svg)](#install)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-3776AB.svg)](#install)
 [![Version 0.3.0](https://img.shields.io/badge/version-0.3.0-0f766e.svg)](pyproject.toml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-0f766e.svg)](LICENSE)
 

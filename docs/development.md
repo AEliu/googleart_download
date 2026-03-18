@@ -10,6 +10,7 @@ The repository uses:
 - `ruff` for formatting and linting
 - `mypy` for static type checking
 - `unittest` for the default test suite
+- Python 3.12+ (CI uses 3.12)
 
 ## Common Commands
 

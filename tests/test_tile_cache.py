@@ -376,5 +376,28 @@ class TileCacheTests(unittest.TestCase):
             self.assertNotEqual(resolved.name, "legacy-random")
 
 
+    def test_auto_backend_prefers_bigtiff_when_memory_unknown_and_large_canvas(self) -> None:
+        tile_info = TileInfo(
+            tile_width=256,
+            tile_height=256,
+            levels=[PyramidLevel(z=0, num_tiles_x=200, num_tiles_y=200, empty_pels_x=0, empty_pels_y=0)],
+        )
+        from unittest.mock import patch
+
+        with patch("googleart_download.download.image_writer._read_available_memory_bytes", return_value=None):
+            self.assertEqual(choose_stitch_backend(tile_info, StitchBackend.AUTO), StitchBackend.BIGTIFF)
+
+    def test_auto_backend_prefers_pillow_when_memory_unknown_and_small_canvas(self) -> None:
+        tile_info = TileInfo(
+            tile_width=256,
+            tile_height=256,
+            levels=[PyramidLevel(z=0, num_tiles_x=8, num_tiles_y=8, empty_pels_x=0, empty_pels_y=0)],
+        )
+        from unittest.mock import patch
+
+        with patch("googleart_download.download.image_writer._read_available_memory_bytes", return_value=None):
+            self.assertEqual(choose_stitch_backend(tile_info, StitchBackend.AUTO), StitchBackend.PILLOW)
+
+
 if __name__ == "__main__":
     unittest.main()
