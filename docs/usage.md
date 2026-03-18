@@ -72,7 +72,7 @@ uv run artx --url-file urls.txt --batch-state-file state/downloads.json
 Overlap download and stitching across adjacent artworks:
 
 ```bash
-uv run googleart-download --url-file urls.txt --pipeline-artworks
+uv run artx --url-file urls.txt --pipeline-artworks
 ```
 
 `--pipeline-artworks` is a batch-only throughput option. While artwork N is stitching, artwork N+1 may already be downloading its tiles. In the current implementation this overlap is fixed to one download phase plus one stitch phase rather than general multi-artwork parallel execution.

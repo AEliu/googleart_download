@@ -117,7 +117,7 @@ uv run artx --rerun-failed
 让批量下载在相邻作品之间重叠下载和拼接：
 
 ```bash
-uv run googleart-download --url-file urls.txt --pipeline-artworks
+uv run artx --url-file urls.txt --pipeline-artworks
 ```
 
 `--pipeline-artworks` 是一个只对 batch 生效的吞吐量选项。它不会改变现有批量结果语义，但当第 N 张作品在拼接时，第 N+1 张作品可以提前开始下载 tile。当前实现固定为“一个下载阶段 + 一个拼接阶段”的重叠，不是完全的多作品并行执行。

@@ -115,7 +115,7 @@ Use `--resume-batch` when a batch stopped partway through and you want to contin
 Overlap batch download and stitching for adjacent artworks:
 
 ```bash
-uv run googleart-download --url-file urls.txt --pipeline-artworks
+uv run artx --url-file urls.txt --pipeline-artworks
 ```
 
 `--pipeline-artworks` is a batch-only throughput option. It keeps the current batch semantics, but while artwork N is stitching the downloader may already fetch tiles for artwork N+1. In the current implementation this overlap is fixed to one download phase plus one stitch phase, not full multi-artwork parallelism.
