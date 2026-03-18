@@ -120,7 +120,7 @@ uv run artx --rerun-failed
 uv run artx --url-file urls.txt --pipeline-artworks
 ```
 
-`--pipeline-artworks` 是一个只对 batch 生效的吞吐量选项。它不会改变现有批量结果语义，但当第 N 张作品在拼接时，第 N+1 张作品可以提前开始下载 tile。当前实现固定为“一个下载阶段 + 一个拼接阶段”的重叠，不是完全的多作品并行执行。
+`--pipeline-artworks` 是一个只对 batch 生效的吞吐量选项。它不会改变现有批量结果语义，但当第 N 张作品在拼接时，第 N+1 张作品可以提前开始下载 tile。当前实现固定为“一个下载阶段 + 一个拼接阶段”的重叠，不是完全的多作品并行执行。在 pipeline 模式下配合 `--fail-fast` 使用时，出现首个错误后将停止发起新的下载阶段；已经排队的拼接会继续完成，以避免留下部分未完成的工作。
 
 写 sidecar 或 EXIF 元数据：
 
