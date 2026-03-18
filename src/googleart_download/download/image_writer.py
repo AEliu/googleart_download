@@ -113,7 +113,7 @@ def _read_available_memory_bytes() -> int | None:
             return int(os.sysconf("SC_AVPHYS_PAGES")) * int(os.sysconf("SC_PAGE_SIZE"))
     # Windows or unknown: try psutil if available
     try:
-        import psutil  # type: ignore[import-not-found]
+        import psutil  # type: ignore[import-untyped, import-not-found]
 
         return int(psutil.virtual_memory().available)
     except Exception:
