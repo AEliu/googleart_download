@@ -5,11 +5,16 @@ import re
 from pathlib import Path
 from types import ModuleType
 
+# cspell:words sysconf AVPHYS
 from PIL import Image
 
 from ..errors import DownloadError
 from ..metadata.output import build_exif_bytes
 from ..models import ArtworkMetadata, DownloadSize, StitchBackend, TileInfo
+
+# Heuristic raw-canvas memory cap when both available and total memory are unknown.
+# If estimated raw RGB bytes exceed this value, prefer BIGTIFF over in-memory Pillow stitching.
+UNKNOWN_MEMORY_PILLOW_RAW_BUDGET_BYTES = 2 * 1024 * 1024 * 1024  # 2 GiB
 
 
 def sanitize_filename(name: str) -> str:
@@ -105,9 +110,16 @@ def _read_available_memory_bytes() -> int | None:
                     return int(parts[1]) * 1024
     if hasattr(os, "sysconf"):
         names = getattr(os, "sysconf_names", {})
-        if "SC_AVPHYS_PAGES" in names and "SC_PAGE_SIZE" in names:
-            return int(os.sysconf("SC_AVPHYS_PAGES")) * int(os.sysconf("SC_PAGE_SIZE"))
-    return None
+        sysconf = getattr(os, "sysconf", None)
+        if callable(sysconf) and "SC_AVPHYS_PAGES" in names and "SC_PAGE_SIZE" in names:
+            return int(sysconf("SC_AVPHYS_PAGES")) * int(sysconf("SC_PAGE_SIZE"))
+    # Windows or unknown: try psutil if available
+    try:
+        import psutil  # type: ignore[import-untyped, import-not-found]
+
+        return int(psutil.virtual_memory().available)
+    except Exception:
+        return None
 
 
 def _format_bytes(value: int) -> str:
@@ -126,7 +138,8 @@ def estimate_stitch_memory_bytes(tile_info: TileInfo) -> int:
 def has_safe_pillow_memory_budget(tile_info: TileInfo) -> bool:
     available_bytes = _read_available_memory_bytes()
     if available_bytes is None:
-        return True
+        # Fall back to heuristic: if raw RGB canvas exceeds 2 GiB, treat as unsafe for Pillow
+        return estimate_stitch_memory_bytes(tile_info) <= UNKNOWN_MEMORY_PILLOW_RAW_BUDGET_BYTES
     safety_budget = int(available_bytes * 0.5)
     return estimate_stitch_memory_bytes(tile_info) <= safety_budget
 

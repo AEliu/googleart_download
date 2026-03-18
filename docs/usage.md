@@ -103,6 +103,8 @@ uv run googleart-download "3QFHLJgXCmQm2Q" --jpeg-preset balanced
 
 ## Proxy Support
 
+Note on memory/backends (Windows and non-POSIX): when the system cannot report available RAM, the tool uses a heuristic raw canvas threshold (~2 GiB) to decide whether to switch large images to the safer TIFF/BigTIFF path automatically. If `psutil` is installed, the tool can read available memory on more platforms to make a more precise decision.
+
 Use an explicit proxy:
 
 ```bash

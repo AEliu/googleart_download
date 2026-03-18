@@ -484,8 +484,9 @@ class CliTests(unittest.TestCase):
                 "https://artsandculture.google.com/asset/example/failed-two",
             ],
         )
-        self.assertEqual(kwargs["batch_state_file"], "downloads/.googleart-batch-rerun-state.json")
-        reporter.log.assert_any_call("Loaded 2 failed artwork(s) from downloads/.googleart-batch-state.json")
+        self.assertEqual(Path(kwargs["batch_state_file"]), Path("downloads/.googleart-batch-rerun-state.json"))
+        expected_loaded = f"Loaded 2 failed artwork(s) from {Path('downloads/.googleart-batch-state.json')}"
+        reporter.log.assert_any_call(expected_loaded)
 
     def test_main_passes_proxy_to_batch_manager_and_canonicalization(self) -> None:
         reporter = MagicMock()
@@ -536,7 +537,9 @@ class CliTests(unittest.TestCase):
 
         self.assertEqual(code, 0)
         manager_cls.assert_not_called()
-        reporter.log.assert_any_call("No failed tasks found in batch state file: downloads/.googleart-batch-state.json")
+        # Normalize path separator for cross-platform
+        expected_msg = f"No failed tasks found in batch state file: {Path('downloads/.googleart-batch-state.json')}"
+        reporter.log.assert_any_call(expected_msg)
 
     def test_render_summary_shows_output_format_and_backend(self) -> None:
         stdout = io.StringIO()
