@@ -230,7 +230,10 @@ class BatchDownloadManager:
                     else:
                         self._complete_task(task, result)
 
-                if stop_batch and download_slot is None and finalize_slot is None:
+                # If fail-fast triggered, stop launching new downloads but allow any
+                # in-flight prepare tasks to finish and drain the queued finalize work.
+                # Only break when there's truly nothing left to finalize or wait on.
+                if stop_batch and download_slot is None and finalize_slot is None and not staged_queue:
                     break
 
         return stop_batch
