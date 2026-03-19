@@ -376,6 +376,169 @@ class BatchManagerTests(unittest.TestCase):
         self.assertEqual(result.snapshot.failed, 1)
         self.assertEqual(result.snapshot.pending, 1)
 
+    def test_pipeline_fail_fast_on_finalize_allows_queued_finalize_and_stops_new_downloads(self) -> None:
+        url1 = "https://artsandculture.google.com/asset/example/one"
+        url2 = "https://artsandculture.google.com/asset/example/two"
+        url3 = "https://artsandculture.google.com/asset/example/three"
+
+        calls_prepare: list[str] = []
+        calls_finalize: list[str] = []
+
+        finalize_started_url1 = threading.Event()
+        second_prepared_ready = threading.Event()
+
+        prepared_by_url: dict[str, PreparedArtworkDownload] = {}
+
+        def fake_prepare(task):  # type: ignore[no-untyped-def]
+            calls_prepare.append(task.url)
+            prepared = PreparedArtworkDownload(data=MagicMock(), workspace=MagicMock(), tiles={})
+            prepared_by_url[task.url] = prepared
+            if task.url == url2:
+                # ensure overlap: finalize for url1 has started before url2 finishes preparing
+                self.assertTrue(finalize_started_url1.wait(timeout=2))
+                second_prepared_ready.set()
+            return prepared
+
+        def fake_finalize(prepared):  # type: ignore[no-untyped-def]
+            matched_url = next(url for url, candidate in prepared_by_url.items() if candidate is prepared)
+            calls_finalize.append(matched_url)
+            if matched_url == url1:
+                # Start finalize for url1, but don't fail until url2 is prepared/queued
+                finalize_started_url1.set()
+                self.assertTrue(second_prepared_ready.wait(timeout=2))
+                raise DownloadError("finalize failed")
+            else:
+                return DownloadResult(
+                    url=matched_url,
+                    output_path=Path("/tmp/out.jpg"),
+                    title=matched_url.rsplit("/", 1)[-1],
+                    size=(10, 10),
+                    tile_count=1,
+                )
+
+        with TemporaryDirectory() as tmpdir:
+            manager = BatchDownloadManager(
+                urls=[url1, url2, url3],
+                output_dir=Path(tmpdir),
+                filename=None,
+                workers=1,
+                jpeg_quality=95,
+                retry_config=RetryConfig(attempts=1),
+                reporter=SilentReporter(),
+                fail_fast=True,
+                download_size=DownloadSize.MAX,
+                max_dimension=None,
+                output_conflict_policy=OutputConflictPolicy.OVERWRITE,
+                write_metadata=False,
+                write_sidecar=False,
+                pipeline_artworks=True,
+            )
+            with (
+                patch.object(manager, "_run_download_phase_for_task", side_effect=fake_prepare),
+                patch.object(manager, "_run_finalize_phase_for_prepared", side_effect=fake_finalize),
+            ):
+                result = manager.run()
+
+        # Only first two downloads launched; third should never start
+        self.assertEqual(calls_prepare, [url1, url2])
+        # Finalize attempted for url1 (failed) and url2 (succeeded)
+        self.assertEqual(calls_finalize, [url1, url2])
+
+        # Snapshot: one failed (url1), one succeeded (url2), one pending (url3)
+        self.assertEqual(result.snapshot.failed, 1)
+        self.assertEqual(result.snapshot.succeeded, 1)
+        self.assertEqual(result.snapshot.pending, 1)
+        first_task, second_task, third_task = result.snapshot.tasks
+        self.assertEqual(first_task.url, url1)
+        self.assertEqual(first_task.state, TaskState.FAILED)
+        self.assertEqual(second_task.url, url2)
+        self.assertEqual(second_task.state, TaskState.SUCCEEDED)
+        self.assertEqual(third_task.url, url3)
+        self.assertEqual(third_task.state, TaskState.PENDING)
+
+    def test_pipeline_fail_fast_on_finalize_allows_finalize_for_inflight_download(self) -> None:
+        url1 = "https://artsandculture.google.com/asset/example/one"
+        url2 = "https://artsandculture.google.com/asset/example/two"
+        url3 = "https://artsandculture.google.com/asset/example/three"
+
+        calls_prepare: list[str] = []
+        calls_finalize: list[str] = []
+
+        second_download_started = threading.Event()
+        finalize_started_url1 = threading.Event()
+        finalize_failed = threading.Event()
+
+        prepared_by_url: dict[str, PreparedArtworkDownload] = {}
+
+        def fake_prepare(task):  # type: ignore[no-untyped-def]
+            calls_prepare.append(task.url)
+            prepared = PreparedArtworkDownload(data=MagicMock(), workspace=MagicMock(), tiles={})
+            if task.url == url2:
+                # Start downloading url2 before url1 finalize fails, but finish after
+                second_download_started.set()
+                self.assertTrue(finalize_started_url1.wait(timeout=2))
+                self.assertTrue(finalize_failed.wait(timeout=2))
+            prepared_by_url[task.url] = prepared
+            return prepared
+
+        def fake_finalize(prepared):  # type: ignore[no-untyped-def]
+            matched_url = next(url for url, candidate in prepared_by_url.items() if candidate is prepared)
+            calls_finalize.append(matched_url)
+            if matched_url == url1:
+                finalize_started_url1.set()
+                # Ensure url2 download has started before we fail
+                self.assertTrue(second_download_started.wait(timeout=2))
+                finalize_failed.set()
+                raise DownloadError("finalize failed")
+            else:
+                return DownloadResult(
+                    url=matched_url,
+                    output_path=Path("/tmp/out.jpg"),
+                    title=matched_url.rsplit("/", 1)[-1],
+                    size=(10, 10),
+                    tile_count=1,
+                )
+
+        with TemporaryDirectory() as tmpdir:
+            manager = BatchDownloadManager(
+                urls=[url1, url2, url3],
+                output_dir=Path(tmpdir),
+                filename=None,
+                workers=1,
+                jpeg_quality=95,
+                retry_config=RetryConfig(attempts=1),
+                reporter=SilentReporter(),
+                fail_fast=True,
+                download_size=DownloadSize.MAX,
+                max_dimension=None,
+                output_conflict_policy=OutputConflictPolicy.OVERWRITE,
+                write_metadata=False,
+                write_sidecar=False,
+                pipeline_artworks=True,
+            )
+            with (
+                patch.object(manager, "_run_download_phase_for_task", side_effect=fake_prepare),
+                patch.object(manager, "_run_finalize_phase_for_prepared", side_effect=fake_finalize),
+            ):
+                result = manager.run()
+
+        # url3 should never be launched
+        self.assertEqual(calls_prepare, [url1, url2])
+        # Finalize attempted for url1 (failed) and url2 (succeeded)
+        self.assertEqual(calls_finalize, [url1, url2])
+
+        # Snapshot: one failed (url1), one succeeded (url2), one pending (url3)
+        self.assertEqual(result.snapshot.failed, 1)
+        self.assertEqual(result.snapshot.succeeded, 1)
+        self.assertEqual(result.snapshot.pending, 1)
+        first_task, second_task, third_task = result.snapshot.tasks
+        self.assertEqual(first_task.url, url1)
+        self.assertEqual(first_task.state, TaskState.FAILED)
+        self.assertEqual(second_task.url, url2)
+        self.assertEqual(second_task.state, TaskState.SUCCEEDED)
+        self.assertEqual(third_task.url, url3)
+        self.assertEqual(third_task.state, TaskState.PENDING)
+
 
 if __name__ == "__main__":
     unittest.main()
