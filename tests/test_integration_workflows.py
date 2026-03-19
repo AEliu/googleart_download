@@ -446,9 +446,7 @@ class CliIntegrationWorkflowTests(unittest.TestCase):
                 with patch("artx.download.downloader.parse_page_info", return_value=page):
                     with patch("artx.download.downloader.parse_tile_info", return_value=tile_info):
                         with patch("artx.download.downloader.build_jobs", return_value=jobs):
-                            with patch(
-                                "artx.download.downloader.await_download_tiles"
-                            ) as await_download_tiles_mock:
+                            with patch("artx.download.downloader.await_download_tiles") as await_download_tiles_mock:
                                 result = download_artwork(
                                     url=page.asset_url,
                                     output_dir=output_dir,

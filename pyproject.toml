@@ -17,7 +17,7 @@ dependencies = [
 ]
 
 [project.scripts]
-artx = "googleart_download.cli:main"
+artx = "artx.cli:main"
 
 [project.optional-dependencies]
 large-images = [
@@ -27,7 +27,7 @@ large-images = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/googleart_download"]
+packages = ["src/artx", "src/googleart_download"]
 
 [tool.ruff]
 target-version = "py312"
@@ -40,4 +40,5 @@ select = ["E", "F", "I"]
 dev = [
     "mypy>=1.19.1",
     "ruff>=0.15.6",
+    "pytest>=8.0.0",
 ]

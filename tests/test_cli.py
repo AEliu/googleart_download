@@ -320,9 +320,7 @@ class CliTests(unittest.TestCase):
 
     def test_dash_prefixed_asset_id_is_treated_as_artwork_input(self) -> None:
         with TemporaryDirectory() as tmpdir:
-            with patch(
-                "artx.cli.inspect_artwork_metadata", return_value={"title": "Artwork"}
-            ) as inspect_mock:
+            with patch("artx.cli.inspect_artwork_metadata", return_value={"title": "Artwork"}) as inspect_mock:
                 with patch("artx.cli.build_reporter", return_value=DummyReporter()):
                     stderr = io.StringIO()
                     with redirect_stderr(stderr):
